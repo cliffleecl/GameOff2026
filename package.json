@@ -10,13 +10,19 @@
     "preview": "vite preview --host",
     "sim": "node sim/sim.mjs",
     "zip": "vite build && node scripts/zip-itch.mjs",
-    "itch": "vite build && node scripts/push-itch.mjs"
+    "itch": "vite build && node scripts/push-itch.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "three": "0.128.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "archiver": "^7.0.1",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^2.1.9"
   }
 }

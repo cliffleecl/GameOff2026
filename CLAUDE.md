@@ -16,6 +16,8 @@ H5 遊戲（Game Jam 主題「Shift」）：跑酷逃生 × 會進化的殭屍�
 npm install
 npm run dev        # Vite 開發伺服器（--host，手機可用同網段連進來）
 npm run sim        # 模擬玩家 30 局；-- --runs 100 指定局數；-- --nobuild 不用道具的對照組
+npm test           # 單元測試（Vitest，只測邏輯層，約 10 秒）
+npm run test:e2e   # E2E（Playwright，打包後在電腦＋手機橫向跑；很吃 CPU，平常交給 GitHub Actions）
 npm run build      # 輸出到 dist/
 npm run preview    # 預覽 dist/
 npm run zip        # build + 壓成 brain-shift-itch.zip
@@ -48,7 +50,10 @@ src/
   ui.js               DOM：狀態列、訊息、報告、小地圖、箭頭、血條
   input.js            鍵盤、滑鼠、觸控虛擬搖桿
   style.css
-sim/sim.mjs           模擬玩家（Node 直接跑邏輯層）
+sim/sim.mjs           模擬玩家（Node 直接跑邏輯層；也 export run() 給測試用）
+tests/unit/           Vitest：地圖、尋路、進化對應、道具放置、整局不卡死
+tests/e2e/            Playwright：開場、移動、道具、結算、手機搖桿與版面（用 window.BS 讀狀態）
+.github/workflows/    test.yml：push／PR 自動跑測試＋模擬；deploy.yml：main 測試過了才發佈 Pages
 scripts/              zip-itch.mjs、push-itch.mjs
 archive/              v1–v4 單檔舊版本，只供對照，不要改
 docs/DESIGN.md        設計文件
@@ -65,7 +70,8 @@ docs/DESIGN.md        設計文件
    模擬玩家很笨，數字只能做前後比較，不能當成真人難度。
 4. **改完畫面或操作，要實際在瀏覽器看**：電腦（約 1280×760）和手機橫向（約 844×390，觸控）。直向觸控會顯示「請轉成橫向」，這是預期行為。
 5. **發佈路徑必須是相對路徑**（`vite.config.js` 的 `base: './'`）。同一份 `dist/` 要能同時放在 itch.io 的 zip 和 GitHub Pages 的子路徑。不要引用外部 CDN，three 走 npm（固定 `0.128.0`，升版要整個重測 view.js）。
-6. **更新文件**：改了規則、數值範圍或設計決定，同步改 `docs/DESIGN.md`（第 9 節的決定紀錄、第 10 節的已知問題）。
+6. **測試**：改了規則就補 `tests/unit/`；改了畫面、操作、DOM 結構就確認 `tests/e2e/` 還對。E2E 不做逐像素比對（WebGL＋亂數不穩定），而是用 `window.BS` 檢查狀態、截圖附在報告裡。測試用固定亂數種子（`tests/helpers/seed.js`），不用改遊戲程式。
+7. **更新文件**：改了規則、數值範圍或設計決定，同步改 `docs/DESIGN.md`（第 9 節的決定紀錄、第 10 節的已知問題）。
 
 ## 設計原則（做決定時用這些判斷）
 
