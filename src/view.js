@@ -7,6 +7,9 @@ import { lerpAngle, hash01 } from './physics.js';
 import { Memory } from './memory.js';
 import { Game } from './game.js';
 import { UI } from './ui.js';
+import { glowMaterial, zombieGeos, ZOMBIE_LOOK, playerGeos, ruinGeos, sandbagGeo, rubbleGeo, obstacleGeo, trapGeo } from './models.js';
+
+const MAX_BLOBS = 80;   // 腳下圓形陰影（殭屍用，一次畫完）的上限
 
 /* =====================================================================
  * 表現層：Three.js
@@ -20,19 +23,26 @@ export const View = {
 
   init() {
     const cv = document.getElementById('cv');
-    this.r = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
-    this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // 手機：解析度上限 1.5 倍（高 DPI 螢幕畫 2 倍很吃 GPU，肉眼差不多）
+    this.mobile = window.matchMedia('(pointer: coarse)').matches;
+    this.r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
+    this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.mobile ? 1.5 : 2));
     this.r.shadowMap.enabled = true; this.r.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x1b1f2e);
     this.scene.fog = new THREE.Fog(0x1a1e2c, 18, 36);   // 依鏡頭距離在 resize 裡調整
     this.cam = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
     this.camDir = new THREE.Vector3(0, 0.82, 0.57).normalize();
     this.camLook = new THREE.Vector3();
-    this.scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a2233, 0.75));
-    const sun = new THREE.DirectionalLight(0xffffff, 0.75);
-    sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+    // 月光：天空偏藍、地面偏紫；主光從左上斜照，陰影拉長一點比較有夜晚感
+    this.scene.add(new THREE.HemisphereLight(0xb9c6ff, 0x2a2233, 0.62));
+    const sun = new THREE.DirectionalLight(0xdfe6ff, 0.78);
+    sun.castShadow = true; sun.shadow.mapSize.set(this.mobile ? 1024 : 2048, this.mobile ? 1024 : 2048); sun.shadow.bias = -0.0015;
     Object.assign(sun.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, near: 1, far: 50 });
     this.scene.add(sun, sun.target); this.sun = sun;
+    // 玩家身邊一圈暖光：角色附近永遠看得清楚（重要資訊在角色附近）
+    this.pLight = new THREE.PointLight(0xffc48a, 0.75, 6.5, 1.6); this.scene.add(this.pLight);
+    // 無線電的燈：平常紅、可以撤離時變綠
+    this.rLight = new THREE.PointLight(0xff5040, 0.8, 7, 1.8); this.scene.add(this.rLight);
     this.makeArena(); this.makeShared(); this.makePlayer(); this.makePools(); this.makeOverlay(); this.makeRadio();
     // 霧團貼圖：柔邊圓形
     const fc = document.createElement('canvas'); fc.width = fc.height = 64; const fg = fc.getContext('2d');
@@ -63,56 +73,112 @@ export const View = {
   },
 
   makeArena() {
-    // 地板：重複貼圖（2x2 格一張），大地圖也不吃記憶體
-    const px = 64, cv = document.createElement('canvas'); cv.width = cv.height = px * 2;
-    const g = cv.getContext('2d');
-    g.fillStyle = '#2b3150'; g.fillRect(0, 0, px * 2, px * 2);
-    g.fillStyle = 'rgba(255,255,255,.025)'; g.fillRect(px, 0, px, px); g.fillRect(0, px, px, px);
-    g.strokeStyle = 'rgba(150,170,235,.5)'; g.lineWidth = 2; g.strokeRect(0, 0, px, px); g.strokeRect(px, 0, px, px); g.strokeRect(0, px, px, px); g.strokeRect(px, px, px, px);
-    const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(C / 2, R / 2); tex.anisotropy = 4;
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(C, R), new THREE.MeshLambertMaterial({ map: tex }));
+    // 地板：整張地圖一張貼圖（每局重畫，見 paintFloor），不會有重複貼圖的感覺
+    this.floorCv = document.createElement('canvas'); this.floorCv.width = C * 32; this.floorCv.height = R * 32;
+    this.floorTex = new THREE.CanvasTexture(this.floorCv); this.floorTex.anisotropy = 4;
+    // 地板切成每格一塊：Lambert 是逐頂點打光，切細了玩家身邊的暖光才照得到地板
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(C, R, C, R), new THREE.MeshLambertMaterial({ map: this.floorTex }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; this.scene.add(floor);
-    const out = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshLambertMaterial({ color: 0x20243a }));
+    const out = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshLambertMaterial({ color: 0x1d2134 }));
     out.rotation.x = -Math.PI / 2; out.position.y = -0.02; this.scene.add(out);
-    const wm = new THREE.MeshLambertMaterial({ color: 0x4a3c3e });   // 外牆壓暗，配合霧氣
-    const mk = (w, d, x, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), wm); m.position.set(x, 0.55, z); m.castShadow = m.receiveShadow = true; this.scene.add(m); };
+    // 外牆：磚牆＋上緣鐵絲網的柱子，壓暗配合霧氣
+    const wm = new THREE.MeshLambertMaterial({ color: 0x4a3c3e }), wt = new THREE.MeshLambertMaterial({ color: 0x5c4c4e }), pm = new THREE.MeshLambertMaterial({ color: 0x3a3d48 });
+    const mk = (w, d, x, z) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), wm); m.position.set(x, 0.55, z); m.castShadow = m.receiveShadow = true; this.scene.add(m);
+      const t = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.08, d + 0.1), wt); t.position.set(x, 1.12, z); this.scene.add(t);
+    };
     mk(C + 2, 1, 0, -R / 2 - 0.5); mk(C + 2, 1, 0, R / 2 + 0.5); mk(1, R, -C / 2 - 0.5, 0); mk(1, R, C / 2 + 0.5, 0);
+    const posts = [];
+    for (let x = -C / 2 - 0.5; x <= C / 2 + 0.5; x += 4) posts.push([x, -R / 2 - 0.5], [x, R / 2 + 0.5]);
+    for (let z = -R / 2 + 3.5; z < R / 2; z += 4) posts.push([-C / 2 - 0.5, z], [C / 2 + 0.5, z]);
+    const pi = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.9, 5), pm, posts.length), mt = new THREE.Matrix4();
+    posts.forEach(([x, z], k) => { mt.makeTranslation(x, 1.6, z); pi.setMatrixAt(k, mt); });
+    this.scene.add(pi);
     this.marker = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.32, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }));
     this.marker.rotation.x = -Math.PI / 2; this.marker.position.y = 0.03; this.scene.add(this.marker);
   },
   /** 廢墟：用 InstancedMesh 一次畫完，高低、顏色各不同 */
+  /** 每局重建：廢墟（三種造型）、沙包矮牆、地上碎石、地板貼圖。全部用 InstancedMesh，一種造型一次畫完 */
   buildRocks() {
-    if (this.rocksMesh) { this.scene.remove(this.rocksMesh); this.rocksMesh.geometry.dispose(); }
-    let n = 0; for (let i = 0; i < N; i++) if (Grid.rock[i]) n++;
-    const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, n));
-    const mat = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
-    let k = 0;
+    for (const m of this.envMeshes || []) { this.scene.remove(m); m.dispose && m.dispose(); }
+    this.envMeshes = [];
+    if (!this.envGeo) this.envGeo = { ruins: ruinGeos(), sand: sandbagGeo(), rubble: rubbleGeo(), mat: new THREE.MeshLambertMaterial({ vertexColors: true }) };
+    const E = this.envGeo, mat = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
+    const inst = (geo, list, shadow) => {
+      const m = new THREE.InstancedMesh(geo, E.mat, Math.max(1, list.length));
+      list.forEach((o, k) => { q.setFromAxisAngle(up, o.rot); mat.compose(o.pos, q, o.scale); m.setMatrixAt(k, mat); m.setColorAt(k, o.col); });
+      m.count = list.length; m.castShadow = shadow; m.receiveShadow = true;
+      m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      this.scene.add(m); this.envMeshes.push(m);
+    };
+    // 廢墟：高度不要太高（0.5–1.2），免得擋住角色；顏色在冷灰之間變化
+    const ruins = [[], [], []];
     for (let i = 0; i < N; i++) {
       if (!Grid.rock[i]) continue;
-      const h = 0.5 + hash01(i, 7) * 0.7,   // 不要太高，免得擋住角色
-      [x, z] = W2(ix(i) + 0.5, iy(i) + 0.5);
-      mat.compose(new THREE.Vector3(x, h / 2, z), q, new THREE.Vector3(0.98, h, 0.98));
-      m.setMatrixAt(k, mat);
-      col.setHSL(0.6 + hash01(i, 3) * 0.08, 0.12, 0.26 + hash01(i, 5) * 0.1); m.setColorAt(k, col);
-      k++;
+      const h = 0.5 + hash01(i, 7) * 0.7, [x, z] = W2(ix(i) + 0.5, iy(i) + 0.5), v = hash01(i, 11);
+      ruins[v < 0.55 ? 0 : v < 0.85 ? 1 : 2].push({ pos: new THREE.Vector3(x, 0, z), rot: (hash01(i, 13) * 4 | 0) * Math.PI / 2,
+        scale: new THREE.Vector3(0.98, h, 0.98), col: new THREE.Color().setHSL(0.6 + hash01(i, 3) * 0.08, 0.1, 0.24 + hash01(i, 5) * 0.08) });
     }
-    m.count = k; m.castShadow = m.receiveShadow = true;
-    m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
-    this.scene.add(m); this.rocksMesh = m;
-    // 矮牆：比廢墟矮很多，看得出來可以翻
-    if (this.lowMesh) { this.scene.remove(this.lowMesh); this.lowMesh.geometry.dispose(); }
-    let nl = 0; for (let i = 0; i < N; i++) if (Grid.low[i]) nl++;
-    const lm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, nl));
-    let kl = 0;
+    ruins.forEach((list, k) => inst(E.ruins[k], list, true));
+    // 矮牆：沙包，比廢墟矮很多，一看就知道翻得過去；沿著牆的方向轉
+    const sand = [];
     for (let i = 0; i < N; i++) {
       if (!Grid.low[i]) continue;
-      const [x, z] = W2(ix(i) + 0.5, iy(i) + 0.5);
-      mat.compose(new THREE.Vector3(x, 0.2, z), q, new THREE.Vector3(0.96, 0.4, 0.96));
-      lm.setMatrixAt(kl, mat); col.setHSL(0.08, 0.12, 0.42 + hash01(i, 9) * 0.08); lm.setColorAt(kl, col); kl++;
+      const [x, z] = W2(ix(i) + 0.5, iy(i) + 0.5), x0 = ix(i), y0 = iy(i);
+      const horiz = (inB(x0 - 1, y0) && Grid.low[idx(x0 - 1, y0)]) || (inB(x0 + 1, y0) && Grid.low[idx(x0 + 1, y0)]);
+      sand.push({ pos: new THREE.Vector3(x, 0, z), rot: (horiz ? 0 : Math.PI / 2) + (hash01(i, 9) - 0.5) * 0.12,
+        scale: new THREE.Vector3(1, 0.95 + hash01(i, 4) * 0.15, 1), col: new THREE.Color().setHSL(0.1, 0.28, 0.5 + hash01(i, 9) * 0.08) });
     }
-    lm.count = kl; lm.castShadow = lm.receiveShadow = true;
-    lm.instanceMatrix.needsUpdate = true; if (lm.instanceColor) lm.instanceColor.needsUpdate = true;
-    this.scene.add(lm); this.lowMesh = lm;
+    inst(E.sand, sand, true);
+    // 碎石：撒在廢墟旁邊的空地上（純裝飾，不擋路）
+    const rub = [];
+    for (let i = 0; i < N; i++) {
+      if (Grid.rock[i] || Grid.low[i] || hash01(i, 21) > 0.5) continue;
+      let near = 0; for (const [dx, dy] of DIR4) { const x = ix(i) + dx, y = iy(i) + dy; if (inB(x, y) && Grid.rock[idx(x, y)]) near++; }
+      if (!near) continue;
+      const [x, z] = W2(ix(i) + 0.2 + hash01(i, 22) * 0.6, iy(i) + 0.2 + hash01(i, 23) * 0.6);
+      rub.push({ pos: new THREE.Vector3(x, 0, z), rot: hash01(i, 24) * 6.28, scale: new THREE.Vector3(1, 1, 1).multiplyScalar(0.8 + hash01(i, 25) * 0.6),
+        col: new THREE.Color().setHSL(0.62, 0.08, 0.42 + hash01(i, 26) * 0.1) });
+    }
+    inst(E.rubble, rub, false);
+    this.paintFloor();
+  },
+  /** 地板：柏油底、裂縫、污漬、淡淡的格線（放道具時看得出格子），廢墟和沙包腳邊畫上接觸陰影 */
+  paintFloor() {
+    const S = 32, g = this.floorCv.getContext('2d'), W = C * S, H = R * S;
+    g.fillStyle = '#272c44'; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < N; i++) {     // 每格亮度一點點不同，像一塊塊鋪面
+      const v = hash01(i, 31); if (v < 0.5) continue;
+      g.fillStyle = `rgba(255,255,255,${(v - 0.5) * 0.05})`; g.fillRect(ix(i) * S, iy(i) * S, S, S);
+    }
+    for (let k = 0; k < 9000; k++) {  // 柏油顆粒
+      const x = Math.random() * W, y = Math.random() * H, l = Math.random() < 0.5;
+      g.fillStyle = l ? 'rgba(200,210,255,.07)' : 'rgba(0,0,0,.18)'; g.fillRect(x, y, 1.5, 1.5);
+    }
+    const blot = (x, y, r, c) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, c); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); };
+    for (let k = 0; k < 26; k++) blot(Math.random() * W, Math.random() * H, 30 + Math.random() * 70, 'rgba(8,10,18,.35)');      // 油污、水漬
+    for (let k = 0; k < 8; k++) blot(Math.random() * W, Math.random() * H, 20 + Math.random() * 30, 'rgba(70,90,40,.22)');     // 屍水
+    g.strokeStyle = 'rgba(10,12,20,.55)'; g.lineCap = 'round';
+    for (let k = 0; k < 34; k++) {    // 裂縫：隨機折線，越畫越細
+      let x = Math.random() * W, y = Math.random() * H, a = Math.random() * 6.28, w = 2.2;
+      g.beginPath(); g.moveTo(x, y);
+      for (let j = 0; j < 7 + Math.random() * 8; j++) { a += (Math.random() - 0.5) * 1.2; x += Math.cos(a) * 14; y += Math.sin(a) * 14; g.lineWidth = w; g.lineTo(x, y); w *= 0.88; }
+      g.stroke();
+    }
+    g.strokeStyle = 'rgba(150,170,235,.09)'; g.lineWidth = 1;   // 格線
+    g.beginPath(); for (let x = 0; x <= C; x++) { g.moveTo(x * S, 0); g.lineTo(x * S, H); } for (let y = 0; y <= R; y++) { g.moveTo(0, y * S); g.lineTo(W, y * S); } g.stroke();
+    g.strokeStyle = 'rgba(150,170,235,.16)'; g.lineWidth = 2;
+    g.beginPath(); for (let x = 0; x <= C; x += 2) { g.moveTo(x * S, 0); g.lineTo(x * S, H); } for (let y = 0; y <= R; y += 2) { g.moveTo(0, y * S); g.lineTo(W, y * S); } g.stroke();
+    // 無線電周圍：畫一圈直升機停機坪記號
+    const [rx, ry] = [RADIO.x * S, RADIO.y * S];
+    g.strokeStyle = 'rgba(230,220,160,.18)'; g.lineWidth = 6; g.beginPath(); g.arc(rx, ry, CFG.EVAC.radius * S * 0.75, 0, 6.283); g.stroke();
+    g.fillStyle = 'rgba(230,220,160,.14)'; g.font = `bold ${S * 1.6}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', rx, ry + S * 1.8);
+    // 接觸陰影：讓廢墟、沙包「站」在地上
+    for (let i = 0; i < N; i++) {
+      if (Grid.rock[i]) blot((ix(i) + 0.5) * S, (iy(i) + 0.5) * S, S * 1.05, 'rgba(5,6,12,.55)');
+      else if (Grid.low[i]) blot((ix(i) + 0.5) * S, (iy(i) + 0.5) * S, S * 0.8, 'rgba(5,6,12,.35)');
+    }
+    this.floorTex.needsUpdate = true;
   },
   makeRadio() {
     const g = new THREE.Group(), L = c => new THREE.MeshLambertMaterial({ color: c });
@@ -123,7 +189,12 @@ export const View = {
     this.radioZone.rotation.x = -Math.PI / 2; this.radioZone.position.y = 0.03; g.add(this.radioZone);
     this.radioBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 14, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x6fdc8c, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
     this.radioBeam.position.y = 7; g.add(this.radioBeam);
+    // 無線電旁的細節：發電機、電線、小桌，讓它像一個據點
+    const gen = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.45), L(0x6b5a3a)); gen.position.set(-0.9, 0.22, 0.3); gen.castShadow = true; g.add(gen);
+    const pnl = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.05), L(0x2a3040)); pnl.position.set(-0.05, 0.42, 0.46); g.add(pnl);
+    this.radioLeds = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.02), new THREE.MeshBasicMaterial({ color: 0x6fdc8c })); this.radioLeds.position.set(-0.05, 0.48, 0.49); g.add(this.radioLeds);
     const [x, z] = W2(RADIO.x, RADIO.y); g.position.set(x, 0, z); this.scene.add(g);
+    this.rLight.position.set(x + 0.3, 2.2, z);
   },
   makeShared() {
     const L = c => new THREE.MeshLambertMaterial({ color: c });
@@ -150,40 +221,39 @@ export const View = {
       beam: new THREE.MeshBasicMaterial({ color: 0x5fe0ff, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
       goldRing: new THREE.MeshBasicMaterial({ color: 0xf2cb52, transparent: true, opacity: 0.45, depthWrite: false }),
     };
+    this.zMat = glowMaterial();     // 所有殭屍、玩家、道具共用一個材質（頂點顏色）
+    this.obsGeo = obstacleGeo(); this.trapGeo = trapGeo();
+    // 殭屍腳下的圓形陰影：全部殭屍一次畫完（比讓每隻殭屍投射真陰影便宜很多）
+    const sc = document.createElement('canvas'); sc.width = sc.height = 64; const sg = sc.getContext('2d');
+    const gr = sg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(0,0,0,.6)'); gr.addColorStop(0.6, 'rgba(0,0,0,.35)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    sg.fillStyle = gr; sg.fillRect(0, 0, 64, 64);
+    const bg = new THREE.PlaneGeometry(1, 1); bg.rotateX(-Math.PI / 2);
+    this.blobs = new THREE.InstancedMesh(bg, new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sc), transparent: true, depthWrite: false }), MAX_BLOBS);
+    this.blobs.count = 0; this.blobs.frustumCulled = false; this.blobs.renderOrder = 1; this.scene.add(this.blobs);
   },
   makeZombie(z) {
-    const G = this.G, M = this.M, g = new THREE.Group(); g.rotation.order = 'YXZ';
+    // 身體一個 mesh，手腳各掛在關節上（共 5 次繪製）。殭屍不投射真陰影，改用腳下的圓形陰影（blobs）
+    const G = this.G, M = this.M, L = ZOMBIE_LOOK[z.type], geo = zombieGeos(z.type), g = new THREE.Group(); g.rotation.order = 'YXZ';
     const body = new THREE.Group(); g.add(body);
-    const add = (geo, mat, x, y, zz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, zz); m.castShadow = true; body.add(m); return m; };
-    const l1 = add(G.leg, M.jeans, 0.1, 0.15, 0), l2 = add(G.leg, M.jeans, -0.1, 0.15, 0);
-    add(G.torso, M.shirt[z.type], 0, 0.47, 0);
-    const head = add(G.head, M.skin, 0, 0.81, 0.02); add(G.hair, M.hair, 0, 0.97, 0);
-    const a1 = add(G.arm, M.skin, 0.24, 0.56, 0.16), a2 = add(G.arm, M.skin, -0.24, 0.56, 0.16);
+    const torso = new THREE.Group(); torso.position.y = L.legLen; body.add(torso);     // 上半身以髖部為軸往前彎
+    const tm = new THREE.Mesh(geo.body, this.zMat); tm.position.y = -L.legLen; torso.add(tm);
+    const joint = (parent, mesh, x, y) => { const p = new THREE.Group(); p.position.set(x, y, 0); p.add(mesh); parent.add(p); return p; };
+    const l1 = joint(body, new THREE.Mesh(geo.leg, this.zMat), 0.1 * L.w, L.legLen), l2 = joint(body, new THREE.Mesh(geo.leg, this.zMat), -0.1 * L.w, L.legLen);
+    const sh = 0.3, sx = 0.25 * L.w;    // 肩膀：軀幹頂端往下一點
+    const a1 = joint(torso, new THREE.Mesh(geo.armR, this.zMat), sx, sh), a2 = joint(torso, new THREE.Mesh(geo.armL, this.zMat), -sx, sh);
+    torso.rotation.x = L.lean;
     const s = z.def.scale; body.scale.setScalar(s);
-    if (z.type === 'vaulter') { const band = add(G.hair, M.shirt.vaulter, 0, 0.88, 0.01); band.scale.set(1.04, 0.35, 1.04); }   // 跑酷殭屍：頭帶
-    if (z.type === 'pathfinder') { const pack = add(G.torso, M.hair, 0, 0.5, -0.18); pack.scale.set(0.7, 0.8, 0.4); }          // 繞路殭屍：背包
     const alert = new THREE.Mesh(G.cone, M.alert); alert.rotation.x = Math.PI; alert.position.y = 1.4 * s; alert.visible = false; g.add(alert);
     this.scene.add(g);
-    return { g, body, head, l1, l2, a1, a2, alert, phase: Math.random() * 6, hop: 0 };
+    return { g, body, torso, l1, l2, a1, a2, alert, look: L, phase: Math.random() * 6, hop: 0 };
   },
   makePlayer() {
-    const L = c => new THREE.MeshLambertMaterial({ color: c });
-    const g = new THREE.Group(), add = (geo, mat, x, y, z, p = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; p.add(m); return m; };
-    // 跑酷者：橘色帽 T、深色長褲、白球鞋、小背包；手腳各有關節可以擺動
-    const hoodie = L(0xf07a2e), pants = L(0x2b3142), skin = L(0xe2b48c), shoe = L(0xf2f2f2), dark = L(0x1e222e);
-    const limb = (x, y, len, mat, foot) => {
-      const piv = new THREE.Group(); piv.position.set(x, y, 0); g.add(piv);
-      add(new THREE.BoxGeometry(0.1, len, 0.1), mat, 0, -len / 2, 0, piv);
-      if (foot) add(new THREE.BoxGeometry(0.12, 0.06, 0.18), shoe, 0, -len, 0.03, piv);
-      return piv;
-    };
-    const legL = limb(0.08, 0.3, 0.27, pants, true), legR = limb(-0.08, 0.3, 0.27, pants, true);
-    add(new THREE.BoxGeometry(0.32, 0.34, 0.2), hoodie, 0, 0.47, 0);                     // 帽 T 身體
-    add(new THREE.BoxGeometry(0.22, 0.24, 0.1), dark, 0, 0.5, -0.14);                    // 背包
-    add(new THREE.SphereGeometry(0.15, 12, 10), skin, 0, 0.78, 0.01);                    // 頭
-    const hood = add(new THREE.SphereGeometry(0.17, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), hoodie, 0, 0.8, -0.02); hood.rotation.x = -0.35;   // 帽兜
-    add(new THREE.BoxGeometry(0.2, 0.05, 0.04), dark, 0, 0.8, 0.14);                     // 頭帶
-    const armL = limb(0.21, 0.6, 0.27, hoodie, false), armR = limb(-0.21, 0.6, 0.27, hoodie, false);
+    // 跑酷者：身體一個 mesh，手腳掛在關節上擺動（模型在 models.js）
+    const geo = playerGeos(), g = new THREE.Group();
+    const bm = new THREE.Mesh(geo.body, this.zMat); bm.castShadow = true; g.add(bm);
+    const limb = (x, y, lg) => { const piv = new THREE.Group(); piv.position.set(x, y, 0); const m = new THREE.Mesh(lg, this.zMat); m.castShadow = true; piv.add(m); g.add(piv); return piv; };
+    const legL = limb(0.08, 0.3, geo.leg), legR = limb(-0.08, 0.3, geo.leg);
+    const armL = limb(0.21, 0.6, geo.arm), armR = limb(-0.21, 0.6, geo.arm);
     this.scene.add(g);
     const wave = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 40),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -225,13 +295,11 @@ export const View = {
   makeStructure(type) {
     const G = this.G, M = this.M, g = new THREE.Group(), add = (mat, sx, sy, sz, y, p = g) => { const m = new THREE.Mesh(G.cube, mat); m.scale.set(sx, sy, sz); m.position.y = y; m.castShadow = m.receiveShadow = true; p.add(m); return m; };
     const o = { g, type };
-    if (type === 'obstacle') {           // 矮路障：玩家跨得過的高度
+    if (type === 'obstacle') {           // 施工路障：玩家跨得過的高度；被拆時整個被壓扁
       o.body = new THREE.Group(); g.add(o.body);
-      add(M.obstacle, 0.9, 0.38, 0.5, 0.19, o.body);
-      for (let k = 0; k < 3; k++) { const st = add(M.stripe, 0.12, 0.3, 0.52, 0.2, o.body); st.position.x = -0.3 + k * 0.3; }
-    } else if (type === 'trap') {
-      add(M.trap, 0.82, 0.05, 0.82, 0.025);
-      for (let k = 0; k < 4; k++) { const s = add(M.spike, 0.1, 0.16, 0.1, 0.1); s.position.x = (k % 2 ? 0.2 : -0.2); s.position.z = (k < 2 ? 0.2 : -0.2); }
+      const m = new THREE.Mesh(this.obsGeo, this.zMat); m.castShadow = m.receiveShadow = true; o.body.add(m);
+    } else if (type === 'trap') {        // 捕獸夾
+      const m = new THREE.Mesh(this.trapGeo, this.zMat); m.receiveShadow = true; g.add(m);
     } else {
       // 一塊帶骨的肉
       o.ball = new THREE.Group(); o.ball.position.y = 0.25; g.add(o.ball);
@@ -324,27 +392,34 @@ export const View = {
     if (Pd.dest) { const [mx, mz] = W2(Pd.dest.x, Pd.dest.y); this.marker.visible = true; this.marker.position.x = mx; this.marker.position.z = mz; this.marker.scale.setScalar(1 + Math.sin(t * 6) * 0.1); }
     else this.marker.visible = false;
 
+    const bm = new THREE.Matrix4(); let nb = 0;
     for (const z of Game.zombies) {
       let o = this.zMap.get(z.id);
       if (!o) { o = this.makeZombie(z); this.zMap.set(z.id, o); }
-      const [wx, wz] = W2(z.x, z.y);
+      const [wx, wz] = W2(z.x, z.y), L = o.look;
       o.hop += ((z.vaulting ? 0.32 : 0) - o.hop) * Math.min(1, real * 14);   // 跨越時往上跳
       o.g.position.set(wx, o.hop, wz);
       o.yaw = o.yaw === undefined ? yawOf(z.dir) : lerpAngle(o.yaw, yawOf(z.dir), 1 - Math.exp(-8 * real * UI.speed));
       o.g.rotation.y = o.yaw;
       o.phase += dt * (z.moving ? z.def.speed * 6 : z.attacking ? 14 : 2);
-      const sw = z.moving ? Math.sin(o.phase) * 0.5 : 0;
+      // 走路：腳前後擺、手照各型的姿勢往前伸（盲衝伸最長）；攻擊：上半身往前撲、雙手亂抓
+      const sw = z.moving ? Math.sin(o.phase) * 0.55 : 0;
       o.l1.rotation.x = sw; o.l2.rotation.x = -sw;
-      o.a1.rotation.x = z.attacking ? Math.sin(o.phase) * 0.6 - 0.2 : -0.1 + Math.sin(o.phase * 0.5) * 0.08;
-      o.a2.rotation.x = z.attacking ? -Math.sin(o.phase) * 0.6 - 0.2 : -0.1 - Math.sin(o.phase * 0.5) * 0.08;
+      const arm = z.moving ? Math.sin(o.phase) * 0.3 : Math.sin(o.phase * 0.5) * 0.08;
+      o.a1.rotation.x = z.attacking ? L.reach - 0.35 + Math.sin(o.phase) * 0.6 : L.reach - arm;
+      o.a2.rotation.x = z.attacking ? L.reach - 0.35 - Math.sin(o.phase) * 0.6 : L.reach + arm * (z.type === 'breaker' ? 0.3 : 1);
+      o.torso.rotation.x = L.lean * (z.moving ? 1 : 0.6) + (z.attacking ? 0.22 + Math.sin(o.phase) * 0.08 : 0);
+      o.torso.rotation.z = z.waiting ? Math.sin(t * 1.5 + o.phase) * 0.06 : 0;
       o.body.rotation.z = z.moving ? Math.sin(o.phase * 0.5) * 0.08 : 0;
       const f = z.flash > 0 ? 1.18 : 1; o.body.scale.set(z.def.scale * f, z.def.scale / f, z.def.scale * f);
-      o.head.position.y = z.waiting ? 0.81 + Math.sin(t * 2 + o.phase) * 0.02 : 0.81;
+      if (nb < MAX_BLOBS) { const s = z.r * 3 * z.def.scale; bm.makeScale(s, 1, s); bm.setPosition(wx, 0.025, wz); this.blobs.setMatrixAt(nb++, bm); }
       // 頭上標記：紅 = 發現你；黃 = 被障礙卡住
       o.alert.visible = z.alertT > 0 || z.stuckMark > 0 || z.trapMark > 0; o.alert.material = z.alertT > 0 ? this.M.alert : this.M.stuck;
       o.alert.position.y = 1.4 * z.def.scale + Math.sin(t * 12) * 0.05;
       if (z.stuckMark > 0) o.body.position.x = Math.sin(t * 40) * 0.03; else o.body.position.x = 0;
     }
+    this.blobs.count = nb; this.blobs.instanceMatrix.needsUpdate = true;
+    this.pLight.position.set(px, 1.6, pz);
     for (let k = this.corpses.length - 1; k >= 0; k--) {
       const c = this.corpses[k], g = c.o.g; c.t += real;
       g.position.y = -c.t * 1.4;
@@ -393,6 +468,9 @@ export const View = {
     this.radioZone.material.opacity = ev === 'ready' || ev === 'pickup' ? 0.5 + Math.sin(t * 4) * 0.2 : 0;
     this.radioZone.scale.setScalar(ev === 'pickup' ? CFG.EVAC.pickupR / CFG.EVAC.radius : 1);
     this.radioBeam.material.opacity = ev === 'ready' || ev === 'pickup' ? 0.22 : 0.06;
+    this.rLight.color.setHex(ev === 'none' ? 0xff5040 : 0x6fdc8c);
+    this.rLight.intensity = ev === 'none' ? 0.5 + (this.radioLight.visible ? 0.4 : 0) : 0.9 + Math.sin(t * 4) * 0.2;
+    this.radioLeds.material.color.setHex(Math.floor(t * 3) % 2 ? 0x6fdc8c : 0x2f6b40);
 
     for (const p of this.parts) {
       if (p.t <= 0) continue;
