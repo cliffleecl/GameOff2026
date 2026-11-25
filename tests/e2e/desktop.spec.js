@@ -126,10 +126,14 @@ test('進化報告會顯示，5 秒後消失', async ({ page }) => {
   await expect(page.locator('#rTitle')).toHaveText('屍群進化 #1');
   const lines = await page.locator('#rBody li').count();
   expect(lines).toBeLessThanOrEqual(5);   // 族群一行＋最多 4 行重點
-  await expect(page.locator('#report')).toHaveClass(/hide/, { timeout: 30000 });   // 報告用真實時間倒數，軟體繪圖下幀率低會比較久
+  // 報告按幀倒數（每幀最多 0.05 秒），CI 的軟體繪圖一秒只有幾幀，等 5 秒要將近一分鐘；
+  // 所以確認出現後直接把倒數快轉到最後，只驗證「時間到會自己消失」
+  await page.evaluate(() => { BS.UI.reportT = 0.01; });
+  await expect(page.locator('#report')).toHaveClass(/hide/);
 });
 
 test('效能：40 隻殭屍時的幀時間（記錄用，軟體繪圖下只當相對比較）', async ({ page }, info) => {
+  test.setTimeout(150_000);   // CI 機器用軟體繪圖，一幀可能要好幾百毫秒
   await boot(page);
   await start(page);
   await page.evaluate(() => {
@@ -138,7 +142,7 @@ test('效能：40 隻殭屍時的幀時間（記錄用，軟體繪圖下只當�
   });
   const ms = await page.evaluate(() => new Promise(res => {
     const ts = []; let last = performance.now();
-    const f = now => { ts.push(now - last); last = now; if (ts.length < 120) requestAnimationFrame(f); else res(ts.sort((a, b) => a - b)); };
+    const f = now => { ts.push(now - last); last = now; if (ts.length < 30) requestAnimationFrame(f); else res(ts.sort((a, b) => a - b)); };
     requestAnimationFrame(f);
   }));
   const med = ms[ms.length >> 1], p95 = ms[Math.floor(ms.length * 0.95)];
