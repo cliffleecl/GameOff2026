@@ -3,3 +3,5 @@ dist/
 brain-shift-itch.zip
 .DS_Store
 *.log
+test-results/
+playwright-report/
