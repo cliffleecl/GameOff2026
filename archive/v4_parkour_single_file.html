@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Brain Shift v4 — 跑酷</title>
+<style>
+  :root{
+    --ink:#ece6d8; --dim:#a3a8bb; --panel:rgba(18,21,33,.84); --line:rgba(255,255,255,.08);
+    --brain:#ef8fab; --go:#e9773b; --hp:#6fdc8c; --bad:#ff6b5e; --gold:#f2cb52; --part:#5fe0ff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:#1b1f2e}
+  body{color:var(--ink);font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;font-size:14px;line-height:1.4;
+       -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+  #app{position:fixed;inset:0}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #fog{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 75% at 50% 52%,transparent 60%,rgba(22,26,40,.35) 86%,rgba(12,14,24,.7) 100%)}
+  #flash{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 120px 30px rgba(255,40,40,.85)}
+
+  #hud{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px;display:flex;gap:6px;align-items:center;pointer-events:none}
+  #hud h1{margin:0 6px 0 0;font-size:16px;font-weight:800;color:var(--brain);white-space:nowrap;text-shadow:0 1px 3px #000}
+  .stat{background:var(--panel);border-radius:8px;padding:3px 9px;text-align:center;min-width:54px}
+  .stat small{display:block;font-size:10px;color:var(--dim)}
+  .stat b{font-size:15px;font-variant-numeric:tabular-nums}
+  #sParts b{color:var(--part)}
+  #brainStat{min-width:56px}
+  #brainBar{height:7px;border-radius:4px;background:#3a2836;overflow:hidden;margin-top:5px}
+  #brainFill{height:100%;width:0;background:var(--brain);transition:width .3s}
+  #brainStat.full #brainFill{animation:brainPulse .6s ease-in-out infinite alternate}
+  @keyframes brainPulse{from{opacity:.55}to{opacity:1}}
+  #hpStat{flex:1;max-width:220px;text-align:left}
+  /* 玩家血條：跟著角色，顯示在腳下；滿血時淡一點，低血變紅 */
+  #pbar{position:absolute;left:0;top:0;width:46px;height:6px;margin:-3px 0 0 -23px;border-radius:3px;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(0,0,0,.35);overflow:hidden;pointer-events:none;transition:opacity .3s;display:none}
+  #pfill{height:100%;width:100%;background:var(--hp);transition:width .2s}
+  #pbar.full{opacity:.4}
+  #pbar.low #pfill{background:var(--bad);animation:brainPulse .5s ease-in-out infinite alternate}
+  #hpBar{height:7px;border-radius:4px;background:#3a2328;overflow:hidden;margin-top:3px}
+  #hpFill{height:100%;width:100%;background:var(--hp);transition:width .2s}
+  #hpStat.low #hpFill{background:var(--bad)}
+  #ticker{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 58px);
+          background:var(--panel);padding:5px 12px;border-radius:14px;font-size:13px;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;pointer-events:none;transition:opacity .4s}
+  #ticker.fade{opacity:0}
+  #ticker.alarm{background:rgba(120,20,20,.9);color:#fff;font-weight:700}
+
+  #report{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 92px);width:min(270px,64vw);font-size:12px;line-height:1.35;padding:7px 10px 6px !important;
+          background:var(--panel);border-left:4px solid var(--brain);border-radius:10px;padding:10px 14px 8px;pointer-events:none;transition:opacity .5s, transform .5s}
+  #report.hide{opacity:0;transform:translate(-50%,-10px)}
+  #report h2{margin:0 0 3px;font-size:13px;color:var(--brain)}
+  #report ul{margin:0;padding-left:0;list-style:none}
+  #report li{margin:2px 0}
+  #report li.comp{margin:0 0 4px;color:var(--gold);font-size:11px;font-variant-numeric:tabular-nums}
+
+  #minimap{position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);border-radius:8px;background:rgba(10,12,20,.75);border:1px solid var(--line);pointer-events:none}
+  .arrow{position:absolute;left:0;top:0;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:22px solid var(--part);
+         filter:drop-shadow(0 0 4px rgba(0,0,0,.8));pointer-events:none;display:none}
+  .arrow.radio{border-bottom-color:var(--hp)}
+  #evac{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 92px);background:rgba(20,60,35,.9);
+        border-radius:12px;padding:8px 16px;font-weight:800;font-size:16px;display:none;pointer-events:none;text-align:center}
+  #evac small{display:block;font-weight:400;font-size:12px;color:#cfe9d6}
+  #evac.out{background:rgba(110,40,20,.9)}
+
+  #bar{position:absolute;left:0;right:0;bottom:0;padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 8px);display:flex;flex-direction:column;gap:6px;pointer-events:none}
+  .row{display:flex;gap:6px;pointer-events:auto}
+  button{font:inherit;color:var(--ink);background:var(--panel);border:2px solid var(--line);border-radius:12px;min-height:52px;padding:4px 6px;cursor:pointer;touch-action:manipulation}
+  button:focus-visible{outline:2px solid var(--brain);outline-offset:2px}
+  .bld{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:700}
+  .bld small{font-weight:400;color:var(--gold);font-size:12px}
+  .bld i{width:16px;height:16px;display:block}
+  .bld.poor{opacity:.45} .bld.poor small{color:var(--bad)}
+  .bld:active{transform:scale(.95)}
+  .i-obstacle{background:repeating-linear-gradient(45deg,#e9a23b 0 4px,#3a3f52 4px 8px);border-radius:2px;height:10px !important;margin-top:6px}
+  .i-trap{background:#a8713f;border-radius:2px}.i-bait{background:radial-gradient(circle at 38% 38%,#d8735a,#8a2e22);border-radius:55% 45% 50% 50%;box-shadow:5px 4px 0 -3px #f3ead8}
+  .opt{flex:1;min-height:40px;font-size:13px;border-radius:10px}
+  .opt.on{border-color:var(--brain);color:var(--brain)}
+  #btnReset.arm{background:var(--bad);color:#fff}
+
+  /* ---------- 手機（觸控）：橫向＋左手虛擬搖桿、右手道具 ---------- */
+  #stick{position:absolute;left:0;top:0;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;display:none;pointer-events:none;
+         background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.2);transition:opacity .2s}
+  #stick.idle{opacity:.45}
+  #knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(255,255,255,.38);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  #rotate{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;text-align:center;background:#141826;color:var(--ink);font-size:18px;font-weight:700;line-height:1.8}
+  #rotate .ph{display:inline-block;font-size:44px;animation:rot 1.6s ease-in-out infinite}
+  @keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  body.touch #stick{display:block}
+  body.touch #bar{inset:0;padding:0;display:block}
+  body.touch .row.builds{position:absolute;right:calc(env(safe-area-inset-right,0px) + 16px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+                         display:grid;grid-template-columns:72px 72px;grid-template-areas:". trap" "obstacle bait";gap:10px;width:auto}
+  body.touch .bld{width:72px;height:72px;min-height:0;border-radius:50%;font-size:12px;padding:0;background:rgba(18,21,33,.72);border-width:2px}
+  body.touch .bld[data-b="obstacle"]{grid-area:obstacle} body.touch .bld[data-b="trap"]{grid-area:trap} body.touch .bld[data-b="bait"]{grid-area:bait}
+  body.touch .bld small{font-size:10px}
+  body.touch .row.opts{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);width:auto;gap:8px}
+  body.touch .opt{min-height:34px;padding:2px 12px;font-size:12px;flex:none}
+  body.touch #minimap{top:calc(env(safe-area-inset-top,0px) + 58px);bottom:auto;right:calc(env(safe-area-inset-right,0px) + 10px)}
+  body.touch #hud{padding-left:calc(env(safe-area-inset-left,0px) + 10px);padding-right:calc(env(safe-area-inset-right,0px) + 10px)}
+  body.touch #report{left:calc(env(safe-area-inset-left,0px) + 10px)}
+  @media (orientation:portrait){ body.touch #rotate{display:flex} }
+  #overlay{position:absolute;inset:0;background:rgba(12,14,22,.72);display:flex;align-items:center;justify-content:center;padding:18px;pointer-events:auto}
+  #overlay.hide{display:none}
+  #ocard{background:#1e2233;border-radius:14px;padding:22px 22px 18px;max-width:430px;width:100%;border-top:4px solid var(--brain);max-height:90vh;overflow-y:auto}
+  #ocard.win{border-top-color:var(--hp)} #ocard.lose{border-top-color:var(--bad)}
+  #ocard h1{margin:0;font-size:30px;font-weight:900}
+  #ocard .tag{margin:4px 0 14px;color:var(--brain);font-size:15px}
+  #ocard p{margin:6px 0;color:var(--dim);font-size:13px}
+  #ocard p b{color:var(--ink);font-weight:600}
+  #obtn{width:100%;margin-top:14px;background:var(--go);color:#1d1107;border:0;font-weight:900;font-size:17px}
+
+  @media (max-width:480px){             /* 手機直向：藏標題，狀態欄平均分配寬度 */
+    #hud h1{display:none}
+    .stat{min-width:0;flex:1;padding:3px 6px}
+    #hpStat{flex:1.4;max-width:none}
+    #brainStat{min-width:0}
+  }
+  @media (min-width:900px) and (min-aspect-ratio:11/10){
+    #bar{flex-direction:row;justify-content:center;align-items:flex-end;padding-bottom:14px}
+    .row.builds{flex:0 1 460px} .row.opts{flex:0 1 300px}
+    .opt{min-height:52px}
+    #hud h1{font-size:20px} .stat{min-width:70px}
+    #minimap{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 62px)}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="cv"></canvas>
+  <div id="fog"></div>
+  <div id="flash"></div>
+  <div id="pbar"><div id="pfill"></div></div>
+
+  <header id="hud">
+    <h1>Brain Shift</h1>
+    <div class="stat" id="sParts"><small>零件</small><b id="vParts">0/6</b></div>
+    <div class="stat"><small>材料</small><b id="vMat">0</b></div>
+    <div class="stat"><small>時間</small><b id="vTime">0:00</b></div>
+    <div class="stat" id="brainStat" title="累積夠多學習事件就會進化"><small>屍腦</small><div id="brainBar"><div id="brainFill"></div></div></div>
+  </header>
+  <div id="ticker" class="fade"></div>
+  <div id="report" class="hide"><h2 id="rTitle"></h2><ul id="rBody"></ul></div>
+  <div id="evac"></div>
+  <canvas id="minimap"></canvas>
+  <div class="arrow" id="arPart"></div>
+  <div class="arrow radio" id="arRadio"></div>
+
+  <footer id="bar">
+    <div class="row builds" id="builds">
+      <button class="bld" data-b="obstacle"><i class="i-obstacle"></i>障礙<small>8 材料</small></button>
+      <button class="bld" data-b="trap"><i class="i-trap"></i>陷阱<small>10 材料</small></button>
+      <button class="bld" data-b="bait"><i class="i-bait"></i>誘餌<small>10 材料</small></button>
+    </div>
+    <div class="row opts">
+      <button class="opt" id="btnSpeed">速度 1x</button>
+      <button class="opt" id="btnMem">記憶</button>
+      <button class="opt" id="btnReset">重置</button>
+    </div>
+  </footer>
+
+  <div id="stick"><div id="knob"></div></div>
+  <div id="rotate"><div><span class="ph">📱</span><br>請把手機轉成橫向來玩</div></div>
+  <div id="overlay"><div id="ocard">
+    <h1 id="oTitle">Brain Shift</h1>
+    <div class="tag" id="oTag">你會翻牆，牠們會學。</div>
+    <div id="oBody">
+      <p><b>你是跑酷專家。</b>殭屍殺不死，只能甩掉。矮牆和你放的障礙你都翻得過去，落地後會短暫加速；大部分殭屍翻不過。</p>
+      <p><b>放的位置固定：</b>障礙放在你正前方（衝過去翻、甩開追兵），陷阱放在你腳下（你踩不會觸發，留給追兵）；誘餌是一塊肉，往前丟約 5 格，把附近的殭屍引過去。</p>
+      <p><b>撿材料才能蓋東西。</b>金色箱子是材料，用來做障礙、陷阱、誘餌；越遠的箱子材料越多。</p>
+      <p><b>集滿 6 個零件。</b>藍色光柱是無線電零件。集滿後回中央的無線電呼叫救援，撐 30 秒，再衝回無線電上直升機。</p>
+      <p><b>屍群會進化。</b>一開始多是紅色盲衝殭屍，會直線衝、會卡在障礙後。你用障礙，紫色拆除殭屍變多；你靠翻越甩掉牠們，青色跑酷殭屍變多；你用陷阱、誘餌、躲廢墟，黃色繞路殭屍變多。</p>
+      <p>你沒辦法打殭屍，被碰到就會受傷，只能靠跑、翻越和道具甩掉牠們。</p>
+      <p><b>手機：</b>轉成橫向，左手按住左半邊畫面是虛擬搖桿，右手按道具。<b>電腦：</b>WASD 或滑鼠點地面移動，1–3 丟設施，F 加速，H 記憶。</p>
+    </div>
+    <button id="obtn">開始</button>
+  </div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+ * Brain Shift v4 — 跑酷版（以 v3 搜刮版為基礎）
+ *   玩家不能殺殭屍，只能用自己跨得過的障礙、陷阱、誘餌甩掉牠們。
+ *   四種殭屍＝四種破解障礙的方式；屍群依你的打法「進化」族群比例。
+ * 以下為 v3 原說明：
+ * 核心改動：沒有擊殺獎勵、沒有被動收入、沒有波次。
+ *   錢只能靠撿地圖上的物資；目標是集滿零件、回無線電撐到撤離。
+ *   殭屍持續生成、強度隨時間上升、偶爾來屍潮；
+ *   屍群記憶每 45 秒更新一次（屍腦更新），學你常去哪搜刮、被追時往哪逃。
+ * 邏輯層（CFG / Grid / Memory / Path / Game）不用 THREE、不碰 DOM，可在 Node 測試，
+ * 對應 Unity：CFG→ScriptableObject、Grid→GridManager、Memory→HordeMemory、
+ *             Path→Pathfinder、Game→GameManager + Spawner + ZombieAgent + PlayerController。
+ * ===================================================================== */
+
+/* ============================== CFG ============================== */
+const CFG = {
+  COLS: 40, ROWS: 30,
+  START_MATERIALS: 30,
+  // 跑酷專家：能跨越自己放的障礙（跨越時減速）；盾推只推開、不傷害
+  PLAYER: { hp: 100, speed: 3.0, radius: 0.3, iframe: 0.5, vaultSlow: 0.8, boost: 1.3, boostTime: 1.5,   // 翻越落地後 1.5 秒加速 30%
+            regenDelay: 3, regenSafe: 6, regen: 5,
+            shoveEnabled: false,   // 推開機制先關掉（太強）；改成 true 就恢復
+            shoveTrigger: 0.35, shoveRange: 1.4, shoveCd: 2.0, shoveTime: 0.22, shoveKnock: 7, shoveStun: 0.6 },
+  PARTS: { goal: 6, delay: 5, minDist: 13, radioMin: 8 },
+  SCRAP: { count: 12,   // 材料箱：撿到直接入帳
+            base: 6, farBonus: 10, respawn: 5, minDist: 6, pickR: 0.75 },
+  SPAWN: { startInterval: 6, minInterval: 1.2, ramp: 0.01, ringMin: 11, ringMax: 15,
+           aliveBase: 3, alivePerMin: 2, maxAlive: 32, despawnDist: 22, loseT: 12, rusherOnly: 45 },
+  HORDE: { first: 75, every: 80, warn: 6, base: 6, per: 2, gap: 0.3 },
+  EVAC: { time: 30, radius: 4, pickupR: 1.6, spawnMul: 1.5, horde: 6, extraCap: 6 },
+  // 開場散布的遊蕩殭屍：被牠們看到之前，不會有追兵生成
+  WANDER: { count: 6, minDist: 12, sight: 5, speedMul: 0.4, homeRadius: 4, revert: true },   // revert：被甩掉的追兵回到遊蕩，而不是消失
+  MAP: { blobs: 28, blobLen: [6, 16], segments: 16, segLen: [3, 7], lowShare: 0.5, clearRadius: 5 },
+  BUILD: {
+    obstacle: { name: '障礙', cost: 8,  hp: 60, blocks: true, bumpStun: 1.0, bumpKnock: 4 },   // 一次放 3 格寬；你跨得過、多數殭屍跨不過；放下時會撞暈重疊的殭屍
+    trap:     { name: '陷阱', cost: 10, stun: 1.2, slow: 0.45, slowTime: 2, uses: 10 },  // 定身＋減速，觸發 10 次損毀
+    bait:     { name: '誘餌', cost: 10, stall: 2, lure: 9, chance: 0.85, life: 15, throw: 5 },   // 一塊肉：往前丟 5 格，15 秒內把 9 格內的殭屍引過去；chance＝還沒識破時上鉤的機率
+  },
+  /* 四種殭屍＝四種「破解障礙」的方式；sight 只對盲衝型有意義 */
+  ZOMBIE: {
+    rusher:     { name: '盲衝', speed: 2.8,  radius: 0.3,  dmg: 4, scale: 1,    sight: 12 },                       // 比你稍慢，但只照視線直衝、會卡在障礙前
+    pathfinder: { name: '繞路', speed: 3.0,  radius: 0.3,  dmg: 4, scale: 1, baitMul: 0.3 },                      // 比盲衝快；會繞路、預判、繞開陷阱、不太上誘餌的當
+    breaker:    { name: '拆除', speed: 1.8,  radius: 0.4,  dmg: 5, scale: 1.3,  wallDps: 26, wallCost: 4 },        // 弱點：很慢；強項：拆障礙、攻擊稍高
+    vaulter:    { name: '跑酷', speed: 3.5,  radius: 0.26, dmg: 3, scale: 0.92, vaultSlow: 0.85, vaultCost: 1.2 },  // 弱點：不會預判、攻擊低、會踩陷阱；強項：最快、會翻障礙
+  },
+  MEMORY: { evolveAt: 30, minGap: 10,   // 事件觸發：累積 30 點學習事件就進化一次（兩次進化至少間隔 10 秒）
+            snareDanger: 0.6, dangerDecay: 0.8, dangerMax: 8, habitDecay: 0.5, fleeDecay: 0.5, pickWeight: 3,
+            leadBase: 0.2, leadPerEscape: 0.06, leadMax: 1.2, learnedPerUpdate: 0.2, learnedMax: 0.6, reportFade: false,
+            // 族群進化：各類型的出現權重怎麼隨你的打法改變
+            evo: { start: { rusher: 1, pathfinder: 0.15, breaker: 0.05, vaulter: 0 },
+                   // 每種道具對應一種破解型：障礙擋住→拆除；翻越甩掉、陷阱夾到→跑酷；誘餌騙到、躲廢墟甩掉→繞路
+                   blockToBreaker: 0.06, placedToBreaker: 0.03, vaultToVaulter: 0.08, trapToPath: 0.05,
+                   baitToPath: 0.08, losToPath: 0.06, rusherDecay: 0.05, rusherMin: 0.35,
+                   trapLearn: 0.1, trapMax: 0.85, baitLearn: 0.05, baitMax: 0.8,   // 全體對陷阱、誘餌的認識
+                   max: { pathfinder: 3, breaker: 2.5, vaulter: 3 } } },
+};
+
+const C = CFG.COLS, R = CFG.ROWS, N = C * R;
+const idx = (x, y) => y * C + x, ix = i => i % C, iy = i => (i / C) | 0;
+const inB = (x, y) => x >= 0 && y >= 0 && x < C && y < R;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const cellOf = (x, y) => idx(clamp(Math.floor(x), 0, C - 1), clamp(Math.floor(y), 0, R - 1));
+const DIR4 = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+const DIR8 = Array.from({ length: 8 }, (_, k) => [Math.cos(k * Math.PI / 4), Math.sin(k * Math.PI / 4)]);
+const RADIO = { x: C / 2, y: R / 2 };
+const TYPES = ['rusher', 'pathfinder', 'breaker', 'vaulter'];
+
+const Feel = { shake: true, hitstop: true, knockback: true, ragdoll: true, hitfx: true, trail: true, slowmo: true };
+const FX = { hit(){}, hurt(){}, shove(){}, alert(){}, stuck(){}, vault(){}, boost(){}, despawn(){}, pickup(){}, part(){}, horde(){}, report(){}, msg(){}, over(){}, broke(){}, evac(){} };
+const Input = { kx: 0, ky: 0 };
+
+/* ============================== Grid ============================== */
+const Grid = {
+  cells: new Array(N).fill(null), rock: new Uint8Array(N),
+  low: new Uint8Array(N),           // 場景裡的矮牆：你和跑酷殭屍跨得過，其他殭屍過不去，也拆不掉
+  reset() { this.cells.fill(null); },
+  isObstacle(i) { const c = this.cells[i]; return !!c && c.type === 'obstacle'; },
+  /** vault = 這個實體能不能跨越障礙（玩家、跑酷殭屍） */
+  /** 可以翻越的格子：你放的障礙＋場景矮牆 */
+  isVaultable(i) { return this.low[i] === 1 || this.isObstacle(i); },
+  blocks(i, vault) { return this.rock[i] === 1 || (!vault && this.isVaultable(i)); },
+  solid(x, y, vault) { return !inB(x, y) || this.blocks(idx(x, y), vault); },
+  free(i) { return !this.rock[i] && !this.low[i] && !this.cells[i]; },
+  place(i, type) { const d = CFG.BUILD[type]; this.cells[i] = { type, hp: d.hp || 0, uses: d.uses || 0 }; },
+  remove(i) { this.cells[i] = null; },
+  count(type) { let n = 0; for (const c of this.cells) if (c && (!type || c.type === type)) n++; return n; },
+  generate() {
+    const M = CFG.MAP, rock = this.rock, low = this.low; rock.fill(0); low.fill(0);
+    const nearRadio = (x, y) => Math.hypot(x + 0.5 - RADIO.x, y + 0.5 - RADIO.y) < M.clearRadius;
+    for (let k = 0; k < M.blobs; k++) {
+      let x = Math.random() * C | 0, y = Math.random() * R | 0;
+      const len = rnd(M.blobLen[0], M.blobLen[1]) | 0;
+      for (let j = 0; j < len; j++) {
+        if (!nearRadio(x, y)) rock[idx(x, y)] = 1;
+        const [dx, dy] = DIR4[Math.random() * 4 | 0]; x = clamp(x + dx, 0, C - 1); y = clamp(y + dy, 0, R - 1);
+      }
+    }
+    for (let k = 0; k < M.segments; k++) {
+      const hor = Math.random() < 0.5, len = rnd(M.segLen[0], M.segLen[1]) | 0;
+      let x = Math.random() * C | 0, y = Math.random() * R | 0;
+      const isLow = Math.random() < M.lowShare;     // 大部分斷牆是矮牆，翻得過去
+      for (let j = 0; j < len; j++) { if (inB(x, y) && !nearRadio(x, y) && !rock[idx(x, y)] && Math.random() > 0.12) (isLow ? low : rock)[idx(x, y)] = 1; hor ? x++ : y++; }
+    }
+    const seen = new Uint8Array(N), q = [cellOf(RADIO.x, RADIO.y)]; seen[q[0]] = 1;
+    while (q.length) { const c = q.pop(); for (const [dx, dy] of DIR4) { const x = ix(c) + dx, y = iy(c) + dy; if (!inB(x, y)) continue; const n = idx(x, y); if (!seen[n] && !rock[n] && !low[n]) { seen[n] = 1; q.push(n); } } }
+    for (let i = 0; i < N; i++) if (!seen[i] && !low[i]) rock[i] = 1;   // 不翻牆到不了的空地封起來，確保殭屍都追得到你
+  },
+};
+
+/* ---------- 碰撞與路徑工具（都帶 vault 參數） ---------- */
+function resolve(e) {
+  const v = !!e.vault, cx = Math.floor(e.x), cy = Math.floor(e.y);
+  if (Grid.solid(cx, cy, v)) {
+    let best = null, bd = 9;
+    for (const [dx, dy] of DIR4) {
+      if (Grid.solid(cx + dx, cy + dy, v)) continue;
+      const d = Math.hypot(cx + dx + 0.5 - e.x, cy + dy + 0.5 - e.y);
+      if (d < bd) { bd = d; best = [cx + dx, cy + dy]; }
+    }
+    if (best) { e.x = best[0] + 0.5 - (best[0] - cx) * 0.45; e.y = best[1] + 0.5 - (best[1] - cy) * 0.45; }
+    return;
+  }
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const gx = cx + dx, gy = cy + dy;
+    if (!Grid.solid(gx, gy, v)) continue;
+    const qx = clamp(e.x, gx, gx + 1), qy = clamp(e.y, gy, gy + 1);
+    const ddx = e.x - qx, ddy = e.y - qy, d = Math.hypot(ddx, ddy);
+    if (d < e.r && d > 1e-6) { e.x += ddx / d * (e.r - d); e.y += ddy / d * (e.r - d); }
+  }
+}
+function clearLine(ax, ay, bx, by, r, vault) {
+  const dx = bx - ax, dy = by - ay, d = Math.hypot(dx, dy);
+  if (d < 1e-4) return true;
+  const nx = -dy / d * r, ny = dx / d * r, n = Math.ceil(d / 0.25);
+  for (let k = 1; k <= n; k++) {
+    const t = k / n, x = ax + dx * t, y = ay + dy * t;
+    if (Grid.solid(Math.floor(x), Math.floor(y), vault) || Grid.solid(Math.floor(x + nx), Math.floor(y + ny), vault) || Grid.solid(Math.floor(x - nx), Math.floor(y - ny), vault)) return false;
+  }
+  return true;
+}
+/** 視線：只有廢墟會擋（障礙很矮，看得過去） */
+const sight = (ax, ay, bx, by) => clearLine(ax, ay, bx, by, 0.05, true);
+/** 這條直線上有沒有陷阱（認得陷阱的殭屍就不會直直衝過去） */
+function lineHasTrap(ax, ay, bx, by) {
+  const d = Math.hypot(bx - ax, by - ay), n = Math.ceil(d / 0.3);
+  for (let k = 1; k <= n; k++) { const c = Grid.cells[cellOf(ax + (bx - ax) * k / n, ay + (by - ay) * k / n)]; if (c && c.type === 'trap') return true; }
+  return false;
+}
+function lookAhead(e, path, pi) {
+  let k = pi;
+  while (k + 1 < path.length && k - pi < 4) {
+    const n = path[k + 1];
+    if (Grid.blocks(n, e.vault) || !clearLine(e.x, e.y, ix(n) + 0.5, iy(n) + 0.5, e.r, e.vault)) break;
+    // 認得陷阱的殭屍：拉直路徑時也不能切過陷阱
+    if (e.trapRoll !== undefined && Game.knowsTrap(e) && lineHasTrap(e.x, e.y, ix(n) + 0.5, iy(n) + 0.5)) break;
+    k++;
+  }
+  return k;
+}
+function steer(e, mx, my, speed, accel, dt) {
+  const k = 1 - Math.exp(-accel * dt);
+  e.mvx += (mx * speed - e.mvx) * k; e.mvy += (my * speed - e.mvy) * k;
+  e.x += e.mvx * dt; e.y += e.mvy * dt;
+}
+const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
+function hash01(i, seed) {
+  let h = Math.imul(i + 1, 374761393) + Math.imul(seed, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/* ============================== Memory ==============================
+ * 行為記憶（沿用 v3）：habit/pick 熱點 → 埋伏；turn/lead → 預判；看過你撿零件 → 守零件
+ * danger：被陷阱絆住的位置（盲衝型學不會，其他會繞開）
+ * weights：族群組成，每次屍腦更新依你的打法進化
+ * ================================================================= */
+const Memory = {
+  danger: new Float32Array(N), habit: new Float32Array(N), pick: new Float32Array(N), flee: new Float32Array(8), stuck: new Float32Array(N),
+  wDanger: new Float32Array(N), wHabit: new Float32Array(N), wPick: new Float32Array(N), wFlee: new Float32Array(8), wStuck: new Float32Array(N),
+  turn: new Float32Array(3), wTurn: new Float32Array(3),
+  lead: 0, wEscape: 0, partGuard: false, top: [], updates: 0, weights: null, lastShare: null,
+  trapAware: 0, baitWise: 0,   // 屍群認得陷阱、識破誘餌的程度（0~1）
+  reset() {
+    for (const k of ['danger', 'habit', 'pick', 'flee', 'stuck', 'wDanger', 'wHabit', 'wPick', 'wFlee', 'wStuck', 'turn', 'wTurn']) this[k].fill(0);
+    this.lead = 0; this.wEscape = 0; this.partGuard = false; this.top = []; this.updates = 0; this.trapAware = 0; this.baitWise = 0;
+    this.weights = Object.assign({}, CFG.MEMORY.evo.start); this.lastShare = this.share();
+  },
+  share() { const w = this.weights, s = TYPES.reduce((a, t) => a + w[t], 0); const o = {}; for (const t of TYPES) o[t] = w[t] / s; return o; },
+  fleeBest() {
+    let b = 0, sum = 0;
+    for (let k = 0; k < 8; k++) { sum += this.flee[k]; if (this.flee[k] > this.flee[b]) b = k; }
+    return { dir: b, share: sum > 0 ? this.flee[b] / sum : 0 };
+  },
+  turnBias() { const s = this.turn[0] + this.turn[1] + this.turn[2]; return s > 0 ? (this.turn[2] - this.turn[0]) / s * 0.9 : 0; },
+  heat(i) { return this.habit[i] + this.pick[i] * CFG.MEMORY.pickWeight; },
+  /** 族群進化：哪招對牠們有效，就多生能破解那招的類型 */
+  /** 族群進化：你用哪招，就多生能破解那招的類型（用得越多，進化得越快） */
+  evolve(p) {
+    const E = CFG.MEMORY.evo, w = this.weights;
+    this.lastShare = this.share();
+    w.breaker = Math.min(E.max.breaker, w.breaker + E.blockToBreaker * p.stuck + E.placedToBreaker * p.placed);       // 障礙 → 拆除
+    w.vaulter = Math.min(E.max.vaulter, w.vaulter + E.vaultToVaulter * p.vaults);                                      // 翻越 → 跑酷
+    w.pathfinder = Math.min(E.max.pathfinder, w.pathfinder + E.baitToPath * p.baited + E.losToPath * p.losEsc + E.trapToPath * p.snared);   // 誘餌、躲廢墟、陷阱 → 繞路
+    if (p.stuck + p.vaults + p.snared + p.baited + p.losEsc > 0) w.rusher = Math.max(E.rusherMin, w.rusher - E.rusherDecay);
+  },
+  commit(p, obstacles) {
+    const M = CFG.MEMORY;
+    let hs = 0, ps = 0, fs = 0;
+    for (let i = 0; i < N; i++) { hs += this.wHabit[i]; ps += this.wPick[i]; }
+    for (let k = 0; k < 8; k++) fs += this.wFlee[k];
+    for (let i = 0; i < N; i++) {
+      this.danger[i] = Math.min(M.dangerMax, this.danger[i] * M.dangerDecay + this.wDanger[i]);
+      this.habit[i] = this.habit[i] * M.habitDecay + (hs > 0 ? this.wHabit[i] / hs : 0);
+      this.pick[i] = this.pick[i] * M.habitDecay + (ps > 0 ? this.wPick[i] / ps : 0);
+      this.stuck[i] = this.stuck[i] * M.dangerDecay + this.wStuck[i];
+    }
+    for (let k = 0; k < 8; k++) this.flee[k] = this.flee[k] * M.fleeDecay + (fs > 0.5 ? this.wFlee[k] / fs : 0);
+    const ts = this.wTurn[0] + this.wTurn[1] + this.wTurn[2];
+    for (let k = 0; k < 3; k++) this.turn[k] = this.turn[k] * M.fleeDecay + (ts > 0.5 ? this.wTurn[k] / ts : 0);
+    this.lead = Math.min(M.leadMax, this.lead * 0.8 + M.leadBase + M.leadPerEscape * this.wEscape);
+    // 被陷阱夾越多次，屍群越認得陷阱；被誘餌騙越多次，越能識破誘餌（認的是「這種東西」，不是某一格）
+    this.trapAware = Math.min(M.evo.trapMax, this.trapAware + M.evo.trapLearn * p.snared);
+    this.baitWise = Math.min(M.evo.baitMax, this.baitWise + M.evo.baitLearn * p.baited);
+    this.evolve(p);
+    const blur = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const h = this.heat(i); if (!h) continue;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = ix(i) + dx, y = iy(i) + dy; if (inB(x, y)) blur[idx(x, y)] += h; }
+    }
+    const order = Array.from({ length: N }, (_, i) => i).filter(i => blur[i] > 0 && !Grid.rock[i]).sort((a, b) => blur[b] - blur[a]);
+    this.top = [];
+    for (const i of order) {
+      if (this.top.length >= 3) break;
+      if (this.top.every(t => Math.abs(ix(t) - ix(i)) + Math.abs(iy(t) - iy(i)) >= 6)) this.top.push(i);
+    }
+    for (const k of ['wDanger', 'wHabit', 'wPick', 'wFlee', 'wStuck', 'wTurn']) this[k].fill(0);
+    this.wEscape = 0;
+    this.updates++;
+  },
+};
+
+/* ============================== Path（A*，二元堆積） ============================== */
+const Path = {
+  g: new Float32Array(N), came: new Int32Array(N), seen: new Int32Array(N), closed: new Int32Array(N),
+  H: new Int32Array(N * 8), HF: new Float32Array(N * 8), run: 0,
+  find(start, goal, cost) {
+    const run = ++this.run, g = this.g, came = this.came, seen = this.seen, closed = this.closed, H = this.H, HF = this.HF;
+    const gx = ix(goal), gy = iy(goal);
+    let hn = 0;
+    const push = (n, f) => {
+      if (hn >= H.length) return;
+      let i = hn++;
+      while (i > 0) { const p = (i - 1) >> 1; if (HF[p] <= f) break; H[i] = H[p]; HF[i] = HF[p]; i = p; }
+      H[i] = n; HF[i] = f;
+    };
+    const pop = () => {
+      const top = H[0]; hn--;
+      if (hn > 0) {
+        const n = H[hn], f = HF[hn]; let i = 0;
+        for (;;) { const l = 2 * i + 1; if (l >= hn) break; const r = l + 1, m = r < hn && HF[r] < HF[l] ? r : l; if (HF[m] >= f) break; H[i] = H[m]; HF[i] = HF[m]; i = m; }
+        H[i] = n; HF[i] = f;
+      }
+      return top;
+    };
+    seen[start] = run; g[start] = 0; came[start] = -1; push(start, 0);
+    let found = false;
+    while (hn > 0) {
+      const cur = pop();
+      if (closed[cur] === run) continue;
+      closed[cur] = run;
+      if (cur === goal) { found = true; break; }
+      const cx = ix(cur), cy = iy(cur);
+      for (const [dx, dy] of DIR4) {
+        const nx = cx + dx, ny = cy + dy; if (!inB(nx, ny)) continue;
+        const ni = idx(nx, ny); if (closed[ni] === run) continue;
+        const c = cost(ni); if (c === Infinity) continue;
+        const ng = g[cur] + c;
+        if (seen[ni] !== run || ng < g[ni]) { seen[ni] = run; g[ni] = ng; came[ni] = cur; push(ni, ng + Math.abs(nx - gx) + Math.abs(ny - gy)); }
+      }
+    }
+    if (!found) return null;
+    const out = []; let n = goal;
+    while (n !== start) { out.push(n); n = came[n]; }
+    return out.reverse();
+  },
+};
+
+/* ============================== Game ============================== */
+const Game = {
+  phase: 'title', time: 0, materials: 0, parts: 0, zombies: [], player: null, scraps: [], part: null, partT: 0,
+  spawnT: 0, hordeT: 0, hordeWarned: false, hordeQueue: 0, hordeDir: 0, hordeGap: 0, memGap: 0,
+  evac: 'none', evacT: 0, period: null, nextId: 1, scrapId: 1, hitstop: 0, slowT: 0, win: false, spotted: false,
+  portrait: false,
+
+  reset() {
+    Grid.reset(); Grid.generate(); Memory.reset();
+    this.zombies = []; this.scraps = []; this.part = null; this.partT = 2;
+    this.time = 0; this.materials = CFG.START_MATERIALS; this.parts = 0; this.nextId = 1; this.scrapId = 1;
+    this.spawnT = 2; this.hordeT = CFG.HORDE.first; this.hordeWarned = false; this.hordeQueue = 0;
+    this.memGap = 0; this.evac = 'none'; this.evacT = 0; this.hitstop = 0; this.slowT = 0; this.win = false;
+    this.player = { x: RADIO.x + 0.5, y: RADIO.y + 1.5, r: CFG.PLAYER.radius, vault: true, hp: CFG.PLAYER.hp, vx: 0, vy: 0, mvx: 0, mvy: 0, face: -Math.PI / 2,
+                    kx: 0, ky: 0, iframe: 0, shoveCd: 0, shoveT: 0, shoveDir: 0, path: null, pi: 0, dest: null, safeT: 0, regenAcc: 0, vaulting: false, boostT: 0 };
+    this.newPeriod();
+    for (let k = 0; k < CFG.SCRAP.count; k++) this.spawnScrap(true);
+    this.spotted = false; this.seenTypes = {};
+    for (let k = 0; k < CFG.WANDER.count; k++) {
+      const i = this.randomFreeCell((x, y) => Math.hypot(x - RADIO.x, y - RADIO.y) > CFG.WANDER.minDist);
+      if (i >= 0) this.makeWanderer(this.spawnZombie(this.rollType(true), undefined, i));
+    }
+    this.phase = 'title';
+  },
+  begin() { this.phase = 'play'; FX.msg('去撿金色材料箱，找藍色光柱的零件'); },
+  newPeriod() { this.period = { picks: 0, parts: 0, escapes: 0, stuck: 0, vaults: 0, snared: 0, baited: 0, placed: 0, losEsc: 0, dodged: 0, esc: { rusher: 0, pathfinder: 0, breaker: 0, vaulter: 0 } }; },
+  minutes() { return this.time / 60; },
+  learnedRatio() { return Math.min(CFG.MEMORY.learnedMax, CFG.MEMORY.learnedPerUpdate * Memory.updates); },
+
+  /* ---------- 資源 ---------- */
+  randomFreeCell(test) {
+    for (let t = 0; t < 60; t++) { const i = Math.random() * N | 0; if (Grid.free(i) && test(ix(i) + 0.5, iy(i) + 0.5)) return i; }
+    return -1;
+  },
+  spawnScrap(initial) {
+    const S = CFG.SCRAP, P = this.player;
+    const i = this.randomFreeCell((x, y) =>
+      (initial ? Math.hypot(x - RADIO.x, y - RADIO.y) > 4 : Math.hypot(x - P.x, y - P.y) > S.minDist) &&
+      this.scraps.every(s => Math.hypot(s.x - x, s.y - y) > 3));
+    if (i < 0) return;
+    const x = ix(i) + 0.5, y = iy(i) + 0.5, far = Math.min(1, Math.hypot(x - RADIO.x, y - RADIO.y) / 18);
+    this.scraps.push({ id: this.scrapId++, x, y, value: Math.round(S.base + S.farBonus * far) });
+  },
+  spawnPart() {
+    const PC = CFG.PARTS, P = this.player;
+    let best = -1, bs = Infinity;
+    const tries = Math.random() < 0.5 ? 25 : 1;
+    for (let t = 0; t < tries; t++) {
+      const i = this.randomFreeCell((x, y) => Math.hypot(x - P.x, y - P.y) > PC.minDist && Math.hypot(x - RADIO.x, y - RADIO.y) > PC.radioMin);
+      if (i < 0) continue;
+      const h = Memory.heat(i) + Memory.wHabit[i];
+      if (h < bs) { bs = h; best = i; }
+    }
+    if (best < 0) best = this.randomFreeCell(() => true);
+    this.part = { x: ix(best) + 0.5, y: iy(best) + 0.5 };
+    if (Memory.partGuard) {                     // 學會「牠一定會去拿零件」→ 零件旁先放守衛
+      const n = Math.min(2, 1 + Math.floor(this.parts / 3));
+      for (let k = 0, placed = 0; k < 16 && placed < n; k++) {
+        const a = Math.random() * Math.PI * 2, r = rnd(1.5, 3);
+        const gx = clamp(Math.floor(this.part.x + Math.cos(a) * r), 0, C - 1), gy = clamp(Math.floor(this.part.y + Math.sin(a) * r), 0, R - 1);
+        if (Grid.blocks(idx(gx, gy), false)) continue;
+        placed++;
+        const z = this.spawnZombie(this.rollType(), undefined, idx(gx, gy));
+        if (z) { z.mode = 'ambush'; z.ambush = idx(gx, gy); z.guard = true; }
+      }
+    }
+  },
+  updatePickups(dt) {
+    const P = this.player, S = CFG.SCRAP;
+    for (let k = this.scraps.length - 1; k >= 0; k--) {
+      const s = this.scraps[k];
+      if (Math.hypot(s.x - P.x, s.y - P.y) > S.pickR) continue;
+      this.materials += s.value; this.period.picks++;
+      Memory.wPick[cellOf(s.x, s.y)] += 1;
+      this.scraps.splice(k, 1);
+      FX.pickup(s);
+      setTimeoutGame(() => this.spawnScrap(false), S.respawn);
+    }
+    if (this.part && Math.hypot(this.part.x - P.x, this.part.y - P.y) < S.pickR) {
+      Memory.wPick[cellOf(this.part.x, this.part.y)] += 2; this.period.parts++;
+      const p = this.part; this.part = null; this.parts++;
+      FX.part(p, this.parts);
+      if (this.parts >= CFG.PARTS.goal) { this.evac = 'ready'; FX.msg('無線電零件齊了！回到中央的無線電呼叫救援'); }
+      else this.partT = CFG.PARTS.delay;
+    }
+    if (!this.part && this.evac === 'none') { this.partT -= dt; if (this.partT <= 0) this.spawnPart(); }
+  },
+
+  /* ---------- 玩家 ---------- */
+  playerCost(i) { return Grid.rock[i] ? Infinity : Grid.isVaultable(i) ? 2 : 1; },   // 能跨，但跨越會減速，路徑會盡量繞開
+  moveTo(x, y) {
+    const P = this.player;
+    if (this.phase !== 'play') return;
+    let goal = cellOf(x, y);
+    if (Grid.rock[goal]) {
+      let best = -1, bd = 9;
+      for (const [dx, dy] of DIR4) {
+        const nx = ix(goal) + dx, ny = iy(goal) + dy;
+        if (Grid.solid(nx, ny, true)) continue;
+        const d = Math.hypot(nx + 0.5 - P.x, ny + 0.5 - P.y);
+        if (d < bd) { bd = d; best = idx(nx, ny); }
+      }
+      if (best < 0) return;
+      goal = best; x = ix(goal) + 0.5; y = iy(goal) + 0.5;
+    }
+    const path = Path.find(cellOf(P.x, P.y), goal, i => this.playerCost(i));
+    if (!path) return;
+    P.path = path; P.pi = 0; P.dest = { x: clamp(x, ix(goal) + 0.3, ix(goal) + 0.7), y: clamp(y, iy(goal) + 0.3, iy(goal) + 0.7) };
+  },
+  updatePlayer(dt) {
+    const P = this.player, S = CFG.PLAYER, ox = P.x, oy = P.y;
+    let mx = 0, my = 0;
+    if (Input.kx || Input.ky) { mx = Input.kx; my = Input.ky; P.path = null; P.dest = null; }
+    else if (P.path) {
+      if (clearLine(P.x, P.y, P.dest.x, P.dest.y, P.r, true)) P.pi = P.path.length - 1;
+      else P.pi = lookAhead(P, P.path, P.pi);
+      const last = P.pi >= P.path.length - 1;
+      const t = last ? P.dest : { x: ix(P.path[P.pi]) + 0.5, y: iy(P.path[P.pi]) + 0.5 };
+      const dx = t.x - P.x, dy = t.y - P.y, d = Math.hypot(dx, dy);
+      if (d < (last ? 0.08 : 0.25)) { P.pi++; if (P.pi >= P.path.length) { P.path = null; P.dest = null; } }
+      else { mx = dx / d; my = dy / d; if (last && d < 0.6) { mx *= d / 0.6; my *= d / 0.6; } }
+    }
+    const ml = Math.hypot(mx, my);
+    if (ml > 1) { mx /= ml; my /= ml; }
+    // 翻越：在障礙／矮牆上時稍微減速；落地後短暫加速（跑酷的衝勁）
+    const onObs = Grid.isVaultable(cellOf(P.x, P.y));
+    if (!onObs && P.vaulting) { P.boostT = S.boostTime; FX.boost(P); }
+    if (P.boostT > 0) P.boostT -= dt;
+    if (onObs && !P.vaulting) {
+      let near = false; for (const z of this.zombies) if (Math.hypot(z.x - P.x, z.y - P.y) < 3.5) { near = true; break; }
+      if (near) this.period.vaults++;                // 被追時翻越 → 跑酷殭屍會學起來
+      FX.vault(P);
+    }
+    P.vaulting = onObs;
+    steer(P, mx, my, S.speed * (onObs ? S.vaultSlow : P.boostT > 0 ? S.boost : 1), 14, dt);
+    if (ml > 0.05 && P.shoveT <= 0) P.face = Math.atan2(my, mx);
+    if (Math.abs(P.kx) + Math.abs(P.ky) > 0.05) { P.x += P.kx * dt; P.y += P.ky * dt; const k = Math.exp(-10 * dt); P.kx *= k; P.ky *= k; }
+    resolve(P);
+    P.vx = (P.x - ox) / dt; P.vy = (P.y - oy) / dt;
+    if (P.iframe > 0) P.iframe -= dt;
+    P.safeT += dt;
+    if (P.safeT > S.regenDelay && P.hp < S.hp) {
+      let near = false; for (const z of this.zombies) if (Math.hypot(z.x - P.x, z.y - P.y) < S.regenSafe) { near = true; break; }
+      if (!near) { P.regenAcc += S.regen * dt; if (P.regenAcc >= 1) { const k = Math.floor(P.regenAcc); P.hp = Math.min(S.hp, P.hp + k); P.regenAcc -= k; } }
+    }
+    // 盾推（非致命：推開＋暈眩）
+    P.shoveCd -= dt; P.shoveT -= dt;
+    if (S.shoveEnabled && P.shoveCd <= 0) {
+      let best = null, bd = Infinity;
+      for (const z of this.zombies) { const d = Math.hypot(z.x - P.x, z.y - P.y); if (d < P.r + z.r + S.shoveTrigger && d < bd) { bd = d; best = z; } }
+      if (best) {
+        const dir = Math.atan2(best.y - P.y, best.x - P.x);
+        P.shoveCd = S.shoveCd; P.shoveT = S.shoveTime; P.shoveDir = dir; P.face = dir;
+        FX.shove(P.x, P.y, dir);
+        for (const z of this.zombies) {
+          const d = Math.hypot(z.x - P.x, z.y - P.y);
+          if (d > S.shoveRange + z.r) continue;
+          const a = Math.atan2(z.y - P.y, z.x - P.x), k = S.shoveKnock * (z.type === 'breaker' ? 0.4 : 1);
+          if (Feel.knockback) { z.kx = Math.cos(a) * k; z.ky = Math.sin(a) * k; }
+          z.stun = Math.max(z.stun, S.shoveStun * (z.type === 'breaker' ? 0.5 : 1)); z.flash = 0.1;
+          FX.hit(z, a);
+        }
+        if (Feel.hitstop) this.hitstop = Math.max(this.hitstop, 0.06);
+      }
+    }
+    Memory.wHabit[cellOf(P.x, P.y)] += dt;
+    if (Math.hypot(P.vx, P.vy) > 1) {
+      let nz = null, nd = 3;
+      for (const z of this.zombies) { const d = Math.hypot(z.x - P.x, z.y - P.y); if (d < nd) { nd = d; nz = z; } }
+      if (nz) {
+        Memory.wFlee[((Math.round(Math.atan2(P.vy, P.vx) / (Math.PI / 4)) % 8) + 8) % 8] += dt;
+        const ax = P.x - nz.x, ay = P.y - nz.y, a = Math.atan2(ax * P.vy - ay * P.vx, ax * P.vx + ay * P.vy);
+        Memory.wTurn[a < -0.35 ? 0 : a > 0.35 ? 2 : 1] += dt;
+      }
+    }
+  },
+  hurtPlayer(z) {
+    const P = this.player;
+    if (P.iframe > 0) return;
+    P.hp = Math.max(0, P.hp - z.def.dmg); P.iframe = CFG.PLAYER.iframe; P.safeT = 0;
+    if (Feel.knockback) { const a = Math.atan2(P.y - z.y, P.x - z.x); P.kx = Math.cos(a) * 4; P.ky = Math.sin(a) * 4; }
+    if (Feel.slowmo && P.hp > 0 && P.hp <= 30) this.slowT = 0.5;
+    FX.hurt(z.def.dmg);
+  },
+
+  /* ---------- 放置（丟在身後） ---------- */
+  costOf(type) { return CFG.BUILD[type].cost; },
+  throwTarget() {
+    const P = this.player, B = CFG.BUILD.bait, cx = Math.cos(P.face), cy = Math.sin(P.face);
+    for (let d = B.throw; d >= 1; d -= 0.5) {
+      const x = P.x + cx * d, y = P.y + cy * d, c = cellOf(x, y);
+      if (!inB(Math.floor(x), Math.floor(y)) || !Grid.free(c) || !clearLine(P.x, P.y, x, y, 0.05, true)) continue;
+      if (this.scraps.some(s => cellOf(s.x, s.y) === c) || (this.part && cellOf(this.part.x, this.part.y) === c)) continue;
+      return c;
+    }
+    return -1;
+  },
+  drop(type) {
+    if (this.phase !== 'play') return false;
+    const d = CFG.BUILD[type], P = this.player, cost = this.costOf(type);
+    if (this.materials < cost) { FX.msg(`材料不夠：${d.name}要 ${cost} 個`); return false; }
+    const pc = cellOf(P.x, P.y), px = ix(pc), py = iy(pc);
+    // 位置固定：障礙放「正前方」（衝過去翻越、落地加速，追兵被擋在後面）；陷阱、誘餌放「腳下」
+    const k0 = ((Math.round(P.face / (Math.PI / 4)) % 8) + 8) % 8 + (type === 'obstacle' ? 0 : 4);
+    const dirOf = k => [Math.round(Math.cos(k * Math.PI / 4)), Math.round(Math.sin(k * Math.PI / 4))];
+    const ok = (x, y) => inB(x, y) && Grid.free(idx(x, y)) && idx(x, y) !== pc &&
+      !this.scraps.some(s => cellOf(s.x, s.y) === idx(x, y)) && !(this.part && cellOf(this.part.x, this.part.y) === idx(x, y));
+    // 陷阱、誘餌放在你腳下（你踩不會觸發）；腳下已經有東西才改放正後方
+    // 誘餌：往前方丟出去（高的廢墟會擋住，矮牆、障礙丟得過去）
+    if (type === 'bait') {
+      const t = this.throwTarget();
+      if (t < 0) { FX.msg('前面沒有地方丟'); return false; }
+      Grid.place(t, 'bait'); const b = Grid.cells[t]; b.from = { x: P.x, y: P.y }; b.t0 = this.time;
+      this.materials -= cost;
+      for (const z of this.zombies) z.repath = 0;
+      return true;
+    }
+    const underFoot = type === 'trap' && Grid.free(pc) &&
+      !this.scraps.some(s => cellOf(s.x, s.y) === pc) && !(this.part && cellOf(this.part.x, this.part.y) === pc);
+    let c0 = underFoot ? pc : -1, ux = 0, uy = 0;
+    for (const off of [0, 1, -1, 2, -2]) {              // 正前／後方被擋住，才依序往兩側偏
+      if (c0 >= 0) break;
+      const [dx, dy] = dirOf(k0 + off);
+      for (const dist of type === 'obstacle' ? [1, 2] : [1]) {
+        if (ok(px + dx * dist, py + dy * dist)) { c0 = idx(px + dx * dist, py + dy * dist); ux = dx; uy = dy; break; }
+      }
+      if (c0 >= 0) break;
+    }
+    if (c0 < 0) { FX.msg('那個方向沒有空位'); return false; }
+    const placed = [c0];
+    Grid.place(c0, type); this.materials -= cost;
+    if (type === 'obstacle') this.period.placed++;
+    // 障礙一次放一道 3 格寬的路障，橫在你前方
+    if (type === 'obstacle') {
+      for (const sgn of [-1, 1]) {
+        const x = ix(c0) - uy * sgn, y = iy(c0) + ux * sgn;
+        if (!inB(x, y) || !Grid.free(idx(x, y)) || idx(x, y) === pc) continue;
+        if (this.scraps.some(s => cellOf(s.x, s.y) === idx(x, y)) || (this.part && cellOf(this.part.x, this.part.y) === idx(x, y))) continue;
+        Grid.place(idx(x, y), type); placed.push(idx(x, y));
+      }
+      // 放下的障礙跟殭屍重疊 → 撞到牠：往外彈開並暈眩一下
+      const O = CFG.BUILD.obstacle;
+      let bumped = 0;
+      for (const z of this.zombies) {
+        for (const c of placed) {
+          const qx = clamp(z.x, ix(c), ix(c) + 1), qy = clamp(z.y, iy(c), iy(c) + 1);
+          if (Math.hypot(z.x - qx, z.y - qy) >= z.r) continue;
+          const a = Math.atan2(z.y - (iy(c) + 0.5), z.x - (ix(c) + 0.5));
+          z.stun = Math.max(z.stun, O.bumpStun * (z.type === 'breaker' ? 0.5 : 1)); z.flash = 0.15; z.stuckMark = 0;
+          if (Feel.knockback) { z.kx = Math.cos(a) * O.bumpKnock; z.ky = Math.sin(a) * O.bumpKnock; }
+          FX.hit(z, a); bumped++;
+          break;
+        }
+      }
+      if (bumped && Feel.hitstop) this.hitstop = Math.max(this.hitstop, 0.05);
+      if (bumped) FX.msg(bumped > 1 ? `障礙撞暈了 ${bumped} 隻殭屍` : '障礙撞暈了殭屍');
+    }
+    for (const z of this.zombies) { z.repath = 0; resolve(z); }
+    return true;
+  },
+
+  /* ---------- 生成：類型比例來自族群進化 ---------- */
+  rollType(anyTime) {
+    if (!anyTime && this.time < CFG.SPAWN.rusherOnly) return 'rusher';
+    const w = Memory.weights, s = TYPES.reduce((a, t) => a + w[t], 0);
+    let r = Math.random() * s;
+    for (const t of TYPES) { r -= w[t]; if (r <= 0) return t; }
+    return 'rusher';
+  },
+  spawnZombie(type, dir, at) {
+    const S = CFG.SPAWN, P = this.player, def = CFG.ZOMBIE[type];
+    let x = -1, y = -1;
+    if (at !== undefined) { x = ix(at); y = iy(at); }
+    else {
+      for (let t = 0; t < 14; t++) {
+        const a = dir === undefined ? Math.random() * Math.PI * 2 : dir + rnd(-0.6, 0.6), r = rnd(S.ringMin, S.ringMax);
+        const cx = Math.floor(P.x + Math.cos(a) * r), cy = Math.floor(P.y + Math.sin(a) * r);
+        if (inB(cx, cy) && !Grid.blocks(idx(cx, cy), false)) { x = cx; y = cy; break; }
+      }
+      if (x < 0) return null;
+    }
+    const z = { id: this.nextId++, type, def, x: x + 0.5, y: y + 0.5, r: def.radius, vault: type === 'vaulter',
+                cell: idx(x, y), path: [], pi: 0, mvx: 0, mvy: 0, repath: 0, atkCd: 0.6, kx: 0, ky: 0, slow: 0, stun: 0, flash: 0,
+                mode: 'chase', modeT: 0, waiting: false, ambush: -1, roam: -1, baitT: -1, baitSeen: {}, alertT: 0, farT: 0, lostT: 0,
+                lastSeen: null, stuckT: 0, stuckCells: {}, detourT: 0, stuckMark: 0, vaulting: false, baitCheckT: 0, hadSight: false, unseenT: 0,
+                trapRoll: Math.random(),   // 個體差異：屍群「認得陷阱」的比例超過這個值，這隻就會繞開（見 knowsTrap）
+                dir: 0, moving: false, attacking: false, seed: Math.random() * 1e9 | 0, sense: 0.6 + Math.random() * 0.8 };
+    this.zombies.push(z);
+    // 新類型第一次出現：提示牠的特性
+    if (this.phase === 'play' && !this.seenTypes[type]) {
+      this.seenTypes[type] = true;
+      const intro = { pathfinder: '繞路殭屍出現了：會從前方包抄、預判路線、繞開陷阱', breaker: '拆除殭屍出現了：會去拆你放的障礙', vaulter: '跑酷殭屍出現了：很快，會翻牆、翻你的障礙' }[type];
+      if (intro) FX.msg(intro);
+    }
+    return z;
+  },
+  /** 一般生成：類型照族群比例；部分個體再套用學到的戰術（埋伏、預判） */
+  spawnLearned() {
+    const type = this.rollType(), P = this.player, n = Memory.updates;
+    // 拆除殭屍：場上有你放的障礙，就直接衝去拆
+    if (type === 'breaker' && Grid.count('obstacle') > 0) { const z = this.spawnZombie(type); if (z) z.mode = 'demolish'; return; }
+    // 繞路殭屍：從你「正在跑去的方向」冒出來包抄，並預判你的路線
+    if (type === 'pathfinder') {
+      const sp = Math.hypot(P.mvx, P.mvy), z = this.spawnZombie(type, sp > 0.5 ? Math.atan2(P.mvy, P.mvx) : undefined);
+      if (z) z.mode = 'predict'; return;
+    }
+    if (n >= 1 && Math.random() < this.learnedRatio()) {
+      if (Memory.top.length && Math.random() < 0.4) {
+        const t = Memory.top[Math.random() * Memory.top.length | 0];
+        if (Math.hypot(ix(t) + 0.5 - P.x, iy(t) + 0.5 - P.y) > 10) {
+          const ax = clamp(ix(t) + (Math.random() * 5 | 0) - 2, 0, C - 1), ay = clamp(iy(t) + (Math.random() * 5 | 0) - 2, 0, R - 1);
+          if (!Grid.blocks(idx(ax, ay), false)) { const z = this.spawnZombie(type, undefined, idx(ax, ay)); if (z) { z.mode = 'ambush'; z.ambush = t; } return; }
+        }
+      }
+      if (type === 'pathfinder') { const z = this.spawnZombie(type); if (z) z.mode = 'predict'; return; }   // 只有繞路型會預判
+    }
+    this.spawnZombie(type);
+  },
+  aliveCap() { const S = CFG.SPAWN; return Math.min(S.maxAlive, Math.floor(S.aliveBase + S.alivePerMin * this.minutes()) + (this.evac === 'active' || this.evac === 'pickup' ? CFG.EVAC.extraCap : 0)); },
+  /** 讓殭屍進入遊蕩狀態：在 home 附近慢慢晃，看到你才追 */
+  makeWanderer(z) { if (!z) return; z.mode = 'wander'; z.home = cellOf(z.x, z.y); z.roam = -1; z.lastSeen = null; z.lostT = 0; z.farT = 0; z.close = false; z.repath = 0; },
+  /** 被看到了：這隻開始追；第一次被發現時，屍群才開始派追兵 */
+  spot(z) {
+    z.mode = 'chase'; z.alertT = 0.9; z.repath = 0; FX.alert(z);
+    if (!this.spotted) { this.spotted = true; this.spawnT = 2; this.hordeT = CFG.HORDE.first; FX.msg('你被發現了！追兵要來了'); }
+  },
+  chasers() { let n = 0; for (const z of this.zombies) if (z.mode !== 'wander') n++; return n; },
+  updateSpawning(dt) {
+    if (!this.spotted) return;                       // 還沒被發現：只有遊蕩殭屍
+    const S = CFG.SPAWN, H = CFG.HORDE;
+    const mul = this.evac === 'active' || this.evac === 'pickup' ? CFG.EVAC.spawnMul : 1;
+    this.spawnT -= dt;
+    if (this.spawnT <= 0) {
+      this.spawnT = Math.max(S.minInterval, S.startInterval - S.ramp * this.time) / mul;
+      if (this.chasers() < this.aliveCap()) this.spawnLearned();   // 上限只算追兵，不算遊蕩的
+    }
+    this.hordeT -= dt;
+    if (!this.hordeWarned && this.hordeT <= H.warn) {
+      this.hordeWarned = true;
+      const fb = Memory.fleeBest();
+      if (fb.share > 0.25) { const [fx, fy] = DIR8[fb.dir]; this.hordeDir = Math.atan2(fy, fx); }
+      else this.hordeDir = Math.random() * Math.PI * 2;
+      FX.horde(this.hordeDir, true);
+    }
+    if (this.hordeT <= 0) {
+      this.hordeQueue += H.base + H.per * Math.floor(this.time / H.every);
+      this.hordeT = H.every; this.hordeWarned = false; this.hordeGap = 0;
+      FX.horde(this.hordeDir, false);
+    }
+    if (this.hordeQueue > 0) {
+      this.hordeGap -= dt;
+      if (this.hordeGap <= 0) {
+        this.hordeGap = H.gap; this.hordeQueue--;
+        const z = this.spawnZombie(this.rollType(), this.hordeDir);
+        if (z && z.type === 'pathfinder' && Math.random() < this.learnedRatio()) z.mode = 'predict';
+      }
+    }
+  },
+
+  /* ---------- 殭屍 ---------- */
+  /** 各類型的路徑成本：怎麼對待障礙，就是牠們的差別 */
+  zCost(z) {
+    const t = z.type;
+    return i => {
+      if (Grid.rock[i]) return Infinity;
+      let c = 1 + hash01(i, z.seed) * 0.6;
+      const cell = Grid.cells[i];
+      if (Game.knowsTrap(z) && cell && cell.type === 'trap') c += 8;          // 認得陷阱：任何陷阱都繞開
+      if (Grid.low[i]) { if (t === 'vaulter') c += z.def.vaultCost; else return Infinity; }   // 矮牆：只有跑酷型過得去
+      else if (Grid.isObstacle(i)) {
+        if (t === 'breaker') c += z.def.wallCost;
+        else if (t === 'vaulter') c += z.def.vaultCost;
+        else return Infinity;                                           // 盲衝、繞路：過不去
+      }
+      return c;
+    };
+  },
+  /** 陷阱學習全屍群即時生效：屍群認得的比例一上升，場上的殭屍（包括遊蕩的）立刻跟著變聰明
+   *  繞路型天生繞開；盲衝型只學得到一半 */
+  knowsTrap(z) { return z.type === 'pathfinder' || z.trapRoll < Memory.trapAware * (z.type === 'rusher' ? 0.5 : 1); },
+  predictPos(z) {
+    const P = this.player, sp = Math.hypot(P.mvx, P.mvy), lead = Memory.lead * (0.6 + z.sense * 0.5);
+    let a = sp > 0.5 ? Math.atan2(P.mvy, P.mvx) : Math.atan2(P.y - z.y, P.x - z.x);
+    a += Memory.turnBias() * 0.5;
+    const d = Math.max(sp, 2) * lead;
+    return { x: clamp(P.x + Math.cos(a) * d, 0.5, C - 0.5), y: clamp(P.y + Math.sin(a) * d, 0.5, R - 0.5) };
+  },
+  planZombie(z) {
+    const P = this.player, B = CFG.BUILD.bait;
+    z.repath = (z.type === 'vaulter' ? 0.4 : 0.6) + Math.random() * 0.3;
+    if (z.baitT >= 0 && !(Grid.cells[z.baitT] && Grid.cells[z.baitT].type === 'bait')) z.baitT = -1;
+    let goal = cellOf(P.x, P.y);
+    if (z.mode === 'wander' && z.baitT < 0) {
+      if (z.roam < 0 || cellOf(z.x, z.y) === z.roam || Math.random() < 0.08) {
+        const hx = ix(z.home), hy = iy(z.home), r = CFG.WANDER.homeRadius;
+        for (let t = 0; t < 10; t++) {
+          const x = clamp(hx + Math.round(rnd(-r, r)), 0, C - 1), y = clamp(hy + Math.round(rnd(-r, r)), 0, R - 1);
+          if (!Grid.blocks(idx(x, y), z.vault)) { z.roam = idx(x, y); break; }
+        }
+      }
+      z.repath = 1 + Math.random();
+      z.path = Path.find(cellOf(z.x, z.y), z.roam < 0 ? z.home : z.roam, this.zCost(z)) || []; z.pi = 0;
+      return;
+    }
+    const dP = Math.hypot(P.x - z.x, P.y - z.y);
+    const far = (z.mode === 'chase' || z.mode === 'predict') && dP > 13 && !(z.type === 'rusher' && z.lastSeen);
+    if (far) {
+      if (z.roam < 0 || cellOf(z.x, z.y) === z.roam || Math.random() < 0.05) {
+        const t = Memory.top.length && Math.random() < 0.7 ? Memory.top[Math.random() * Memory.top.length | 0] : -1;
+        z.roam = t >= 0 ? t : this.randomFreeCell(() => true);
+      }
+      goal = z.roam;
+    }
+    if (z.type === 'rusher' && z.lastSeen && z.mode === 'chase') goal = cellOf(z.lastSeen.x, z.lastSeen.y);
+    if (z.baitT >= 0) goal = z.baitT;
+    else if (z.mode === 'ambush') goal = z.ambush;
+    else if (z.mode === 'demolish') {
+      let best = -1, bd = 20;
+      for (let i = 0; i < N; i++) if (Grid.isObstacle(i)) { const d = Math.hypot(ix(i) + 0.5 - z.x, iy(i) + 0.5 - z.y); if (d < bd) { bd = d; best = i; } }
+      if (best < 0) z.mode = 'chase'; else if (Math.hypot(P.x - z.x, P.y - z.y) > 2) goal = best;
+    }
+    else if (z.mode === 'predict' && !far) { const p = this.predictPos(z), g = cellOf(p.x, p.y); if (!Grid.blocks(g, z.vault)) goal = g; }
+    z.path = Path.find(cellOf(z.x, z.y), goal, this.zCost(z)) || [];
+    z.pi = 0;
+  },
+  /** 誘餌檢查：每隻殭屍（包括正在衝的盲衝型）定期看附近有沒有誘餌 */
+  checkBait(z) {
+    const B = CFG.BUILD.bait, zx = ix(z.cell), zy = iy(z.cell);
+    for (let y = Math.max(0, zy - B.lure); y <= Math.min(R - 1, zy + B.lure); y++)
+      for (let x = Math.max(0, zx - B.lure); x <= Math.min(C - 1, zx + B.lure); x++) {
+        const i = idx(x, y), c = Grid.cells[i];
+        if (!c || c.type !== 'bait' || z.baitSeen[i] || Math.hypot(x - zx, y - zy) > B.lure) continue;
+        z.baitSeen[i] = 1;
+        const chance = B.chance * (1 - Memory.baitWise) * (z.def.baitMul || 1);
+        if (Math.random() < chance) { z.baitT = i; z.repath = 0; z.lastSeen = null; z.waiting = false; return; }
+      }
+  },
+  updateZombie(z, dt) {
+    const P = this.player;
+    if (z.flash > 0) z.flash -= dt;
+    if (z.alertT > 0) z.alertT -= dt;
+    if (z.slow > 0) z.slow -= dt;
+    if (z.stuckMark > 0) z.stuckMark -= dt;
+    if (z.trapMark > 0) z.trapMark -= dt;
+    if (z.detourT > 0) z.detourT -= dt;
+    z.atkCd -= dt; z.repath -= dt; z.modeT += dt; z.attacking = false;
+    if (Math.abs(z.kx) + Math.abs(z.ky) > 0.05) {
+      z.x += z.kx * dt; z.y += z.ky * dt; const k = Math.exp(-9 * dt); z.kx *= k; z.ky *= k; resolve(z);
+      if (Math.abs(z.kx) + Math.abs(z.ky) > 1.2) { z.moving = false; this.trackCell(z); return; }
+    }
+    if (z.stun > 0) { z.stun -= dt; z.moving = false; return; }
+
+    const dxp = P.x - z.x, dyp = P.y - z.y, dp = Math.hypot(dxp, dyp);
+    if (z.mode === 'wander' && dp < CFG.WANDER.sight && sight(z.x, z.y, P.x, P.y)) this.spot(z);
+    if ((z.baitCheckT -= dt) <= 0) { z.baitCheckT = 0.4; if (z.baitT < 0) this.checkBait(z); }
+    if (z.mode === 'ambush') {
+      if (dp < 5 || z.modeT > (z.guard ? 90 : 30)) { z.mode = 'chase'; z.waiting = false; z.repath = 0; if (dp < 5) { z.alertT = 0.9; FX.alert(z); } }
+    }
+    if (dp < P.r + z.r + 0.12) {
+      z.moving = false; z.mvx *= 0.5; z.mvy *= 0.5; z.dir = Math.atan2(dyp, dxp);
+      if (z.atkCd <= 0) { z.atkCd = 1; this.hurtPlayer(z); }
+      return;
+    }
+    if (z.waiting) { z.moving = false; z.mvx = z.mvy = 0; return; }
+
+    // 盲衝型：看得到你就直直衝過去（不尋路）——所以會被障礙擋住
+    if (z.type === 'rusher' && z.mode === 'chase' && z.baitT < 0 && z.detourT <= 0) {
+      const see = dp < z.def.sight && sight(z.x, z.y, P.x, P.y);
+      if (see && !(this.knowsTrap(z) && lineHasTrap(z.x, z.y, P.x, P.y))) { z.lastSeen = { x: P.x, y: P.y }; z.lostT = 0; this.rushStraight(z, P.x, P.y, dt); return; }
+      if (z.lastSeen && Math.hypot(z.lastSeen.x - z.x, z.lastSeen.y - z.y) < 0.6) z.lastSeen = null;
+      if (z.lastSeen && sight(z.x, z.y, z.lastSeen.x, z.lastSeen.y)) { this.rushStraight(z, z.lastSeen.x, z.lastSeen.y, dt); return; }
+    }
+
+    if (z.repath <= 0 || z.pi >= z.path.length) this.planZombie(z);
+    let tx, ty;
+    if (z.mode === 'chase' && z.type !== 'rusher' && z.baitT < 0 && dp < 5 && clearLine(z.x, z.y, P.x, P.y, z.r * 0.8, z.vault) && !(this.knowsTrap(z) && lineHasTrap(z.x, z.y, P.x, P.y))) { tx = P.x; ty = P.y; }
+    else if (z.mode === 'predict' && z.baitT < 0 && dp < 7) {
+      const p = dp <= 1.6 ? P : this.predictPos(z);
+      if (clearLine(z.x, z.y, p.x, p.y, z.r * 0.8, z.vault) && !(this.knowsTrap(z) && lineHasTrap(z.x, z.y, p.x, p.y))) { tx = p.x; ty = p.y; }
+    }
+    if (tx === undefined) {
+      if (z.pi < z.path.length && !Grid.blocks(z.path[z.pi], z.vault)) z.pi = lookAhead(z, z.path, z.pi);
+      const next = z.path[z.pi];
+      if (next === undefined) {
+        if (z.baitT >= 0) { if (z.cell === z.baitT && Grid.cells[z.cell]) this.eatBait(z, z.cell); else z.baitT = -1; z.repath = 0; return; }
+        if (z.mode === 'ambush') z.waiting = true;
+        z.moving = false; return;
+      }
+      if (Grid.blocks(next, z.vault)) {
+        const s = Grid.cells[next];
+        if (!s || z.type !== 'breaker') { z.repath = 0; z.pi = z.path.length; return; }
+        z.attacking = true; z.moving = false; z.mvx = z.mvy = 0; z.dir = Math.atan2(iy(next) + 0.5 - z.y, ix(next) + 0.5 - z.x);
+        s.hp -= z.def.wallDps * dt;
+        if (s.hp <= 0) this.destroyStructure(next);
+        return;
+      }
+      tx = ix(next) + 0.5; ty = iy(next) + 0.5;
+      const wd = Math.hypot(tx - z.x, ty - z.y);
+      if (wd < 0.25 || (wd < 0.6 && (tx - z.x) * z.mvx + (ty - z.y) * z.mvy < 0)) { z.pi++; this.trackCell(z); return; }
+    }
+    this.moveZombie(z, tx, ty, dt);
+  },
+  moveZombie(z, tx, ty, dt) {
+    // 認得陷阱的殭屍看到前方有陷阱：停頓一下（頭上冒黃色標記、陷阱閃一下），然後繞開
+    if (this.knowsTrap(z) && (z.trapScanT = (z.trapScanT || 0) - dt) <= 0) {
+      z.trapScanT = 0.25;
+      const zx = Math.floor(z.x), zy = Math.floor(z.y);
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const x = zx + dx, y = zy + dy; if (!inB(x, y)) continue;
+        const c = idx(x, y), s = Grid.cells[c];
+        if (!s || s.type !== 'trap' || Math.hypot(x + 0.5 - z.x, y + 0.5 - z.y) > 2.5 || (z.seenTrap || (z.seenTrap = {}))[c]) continue;
+        z.seenTrap[c] = 1; z.trapMark = 0.8; z.repath = 0; this.period.dodged++;   // 只在頭上冒黃色標記，不停頓、不轉頭
+        dy = 3; break;
+      }
+    }
+    const dx = tx - z.x, dy = ty - z.y, d = Math.hypot(dx, dy) || 1;
+    const onObs = z.vault && Grid.isVaultable(cellOf(z.x, z.y));
+    if (onObs && !z.vaulting) FX.vault(z);
+    z.vaulting = onObs;
+    const sp = z.def.speed * (z.slow > 0 ? CFG.BUILD.trap.slow : 1) * (onObs ? z.def.vaultSlow : 1) * (z.mode === 'wander' ? CFG.WANDER.speedMul : 1);
+    steer(z, dx / d, dy / d, sp, z.type === 'vaulter' ? 9 : 6, dt);
+    if (Math.hypot(z.mvx, z.mvy) > 0.1) z.dir = Math.atan2(z.mvy, z.mvx);
+    z.moving = true;
+    resolve(z);
+    this.trackCell(z);
+  },
+  /** 盲衝：直線前進，偵測「被障礙卡住」 */
+  rushStraight(z, tx, ty, dt) {
+    const a = Math.atan2(ty - z.y, tx - z.x);
+    const ahead = cellOf(z.x + Math.cos(a) * (z.r + 0.2), z.y + Math.sin(a) * (z.r + 0.2));
+    // 正前方是障礙：不會沿著障礙滑開，只會一直往前頂（這就是「只照視線跑」）
+    if (Grid.isVaultable(ahead)) { z.mvx = z.mvy = 0; z.moving = true; z.dir = a; }
+    else this.moveZombie(z, tx, ty, dt);
+    if (Grid.isVaultable(ahead)) {
+      z.stuckT += dt;
+      if (z.stuckT > 0.8 && !z.stuckCells[ahead] && Grid.isObstacle(ahead)) {   // 只有「你放的」障礙算進進化
+        z.stuckCells[ahead] = 1; this.period.stuck++; Memory.wStuck[ahead] += 1;
+        z.stuckMark = 1.2; FX.stuck(z);
+      }
+      if (z.stuckT > 4) { z.stuckT = 0; z.detourT = 2.5; z.repath = 0; }     // 卡太久：笨笨地亂繞一下再回來衝
+    } else z.stuckT = Math.max(0, z.stuckT - dt);
+  },
+  trackCell(z) {
+    const c = cellOf(z.x, z.y);
+    if (c === z.cell) return;
+    z.cell = c;
+    const s = Grid.cells[c];
+    if (!s) return;
+    if (s.type === 'trap') {
+      const T = CFG.BUILD.trap;
+      z.stun = Math.max(z.stun, T.stun); z.slow = T.slowTime; z.flash = 0.15; this.period.snared++;
+      if (--s.uses <= 0) { Grid.remove(c); FX.msg('陷阱壞掉了'); }
+    } else if (s.type === 'bait' && z.baitSeen[c] !== 2) this.eatBait(z, c);
+  },
+  eatBait(z, c) {
+    const s = Grid.cells[c];
+    z.baitSeen[c] = 2; z.baitT = -1;
+    if (!s || s.type !== 'bait') return;
+    z.stun = CFG.BUILD.bait.stall; this.period.baited++;
+    // 被肉引走的遊蕩殭屍、守衛會留在這一帶晃（守衛就這樣離開崗位了）
+    if (z.mode === 'wander' || z.mode === 'ambush') { z.mode = 'wander'; z.home = c; z.roam = -1; z.guard = false; }
+  },
+  destroyStructure(i) {
+    const s = Grid.cells[i]; if (!s) return;
+    Grid.remove(i);
+    FX.broke(i, s.type); FX.msg(`${CFG.BUILD[s.type].name}被拆掉了`);
+    for (const z of this.zombies) z.repath = 0;
+  },
+  despawn(z) { z.dead = true; const i = this.zombies.indexOf(z); if (i >= 0) this.zombies.splice(i, 1); FX.despawn(z); },
+
+  updateEvac(dt) {
+    const P = this.player, E = CFG.EVAC, d = Math.hypot(P.x - RADIO.x, P.y - RADIO.y);
+    if (this.evac === 'ready' && d < E.radius) {
+      this.evac = 'active'; this.evacT = E.time; this.spotted = true;
+      this.hordeQueue += E.horde; this.hordeDir = Math.random() * Math.PI * 2;
+      FX.evac('start');
+    } else if (this.evac === 'active') {
+      this.evacT -= dt;
+      if (this.evacT <= 0) { this.evac = 'pickup'; FX.evac('pickup'); }
+    } else if (this.evac === 'pickup' && d < E.pickupR) this.gameOver(true);
+  },
+
+  update(dt) {
+    if (this.phase !== 'play') return;
+    this.time += dt;
+    this.updatePlayer(dt);
+    this.updatePickups(dt);
+    this.updateSpawning(dt);
+    this.updateEvac(dt);
+    if (this.phase !== 'play') return;
+    tickGameTimers(dt);
+    const Z = this.zombies, P = this.player, S = CFG.SPAWN;
+    for (const z of Z.slice()) {
+      if (z.dead) continue;
+      this.updateZombie(z, dt);
+      const d = Math.hypot(z.x - P.x, z.y - P.y);
+      // 躲到廢墟後面：追兵在近處看過你、接著連續 2.5 秒看不到 → 算一次「靠視線甩掉」
+      if (z.mode === 'chase' || z.mode === 'predict') {
+        const see = d < 12 && sight(z.x, z.y, P.x, P.y);
+        if (see && d < 7) { z.hadSight = true; z.unseenT = 0; }
+        else if (z.hadSight && !see && (z.unseenT += dt) > 2.5) { z.hadSight = false; this.period.losEsc++; }
+      }
+      if (d < 2) z.close = true;
+      else if (z.close && d > 8) { z.close = false; Memory.wEscape++; this.period.escapes++; this.period.esc[z.type]++; }
+      // 殭屍殺不死：跟丟你太久就散掉
+      const lost = d > 14 && z.mode !== 'ambush' && z.mode !== 'wander' && z.mode !== 'demolish';
+      z.lostT = lost ? z.lostT + dt : 0;
+      z.farT = d > S.despawnDist && z.mode !== 'ambush' && z.mode !== 'wander' ? z.farT + dt : 0;
+      if (z.farT > 6 || z.lostT > S.loseT) { if (CFG.WANDER.revert) this.makeWanderer(z); else this.despawn(z); }
+    }
+    for (let a = 0; a < Z.length; a++) {
+      const za = Z[a];
+      for (let b = a + 1; b < Z.length; b++) {
+        const zb = Z[b], dx = zb.x - za.x, dy = zb.y - za.y;
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) continue;
+        const d = Math.hypot(dx, dy), m = za.r + zb.r;
+        if (d < m && d > 1e-4) { const p = (m - d) / 2 / d; za.x -= dx * p; za.y -= dy * p; zb.x += dx * p; zb.y += dy * p; }
+      }
+      const dx = za.x - P.x, dy = za.y - P.y, d = Math.hypot(dx, dy), m = za.r + P.r;
+      if (d < m && d > 1e-4) { za.x += dx / d * (m - d); za.y += dy / d * (m - d); }
+      resolve(za);
+    }
+    // 屍群進化：不是固定時間，而是「學到夠多東西」才進化——你玩得越積極，牠們進化得越快
+    this.memGap += dt;
+    if (this.learnPoints() >= CFG.MEMORY.evolveAt && this.memGap >= CFG.MEMORY.minGap) {
+      this.memGap = 0;
+      const lines = this.buildReport();
+      if (this.period.parts) Memory.partGuard = true;
+      Memory.commit(this.period, Grid.count('obstacle'));
+      lines.unshift({ t: this.compositionLine(), c: 'comp' });
+      this.newPeriod();
+      FX.report(Memory.updates, lines);
+    }
+    if (P.hp <= 0) this.gameOver(false);
+  },
+  /** 這段時間累積的學習事件：被擋住、被翻越甩掉、被夾、被騙、被廢墟甩掉、被甩掉、你撿到零件 */
+  learnPoints() { const p = this.period; return p.stuck + p.vaults + p.snared + p.baited + p.losEsc + p.escapes + p.parts * 3; },
+  gameOver(win) { this.phase = 'over'; this.win = win; FX.over(win); },
+
+  /* ---------- 屍腦更新 ---------- */
+  zoneName(i) {
+    const sx = this.portrait ? (R - 1 - iy(i)) / R : ix(i) / C, sy = this.portrait ? ix(i) / C : iy(i) / R;
+    const cx = sx < 0.35 ? 0 : sx < 0.65 ? 1 : 2, cy = sy < 0.35 ? 0 : sy < 0.65 ? 1 : 2;
+    return [['左上', '上方', '右上'], ['左側', '中央', '右側'], ['左下', '下方', '右下']][cy][cx];
+  },
+  compositionLine() {
+    const a = Memory.lastShare, b = Memory.share();
+    return TYPES.map(t => {
+      const p = Math.round(b[t] * 100), d = Math.round((b[t] - a[t]) * 100);
+      return `${CFG.ZOMBIE[t].name}${p}%${d >= 3 ? '↑' : d <= -3 ? '↓' : ''}`;
+    }).join(' ');
+  },
+  buildReport() {
+    const s = this.period, n = Memory.updates + 1, L = !CFG.MEMORY.reportFade ? 0 : n <= 2 ? 0 : n <= 4 ? 1 : 2, out = [];
+    const pick = (a, b, c) => [a, b, c][L];
+    const obs = Grid.count('obstacle');
+    // 族群進化的原因
+    // 精簡版：每行一個重點，最多 4 行，不擋畫面
+    const pct = v => Math.round(v * 100) + '%';
+    if (s.stuck + s.placed >= 2) out.push({ t: `障礙擋住 ×${s.stuck} → 拆除↑` });
+    if (s.vaults >= 1) out.push({ t: `翻越 ×${s.vaults} → 跑酷↑` });
+    if (s.snared + s.baited + s.losEsc >= 1) out.push({ t: `陷阱 ×${s.snared}・誘餌 ×${s.baited}・躲廢墟 ×${s.losEsc} → 繞路↑` });
+    if (s.dodged >= 1) out.push({ t: `閃過陷阱 ×${s.dodged}（牠們看得出那是陷阱了）` });
+    if (s.snared >= 2) out.push({ t: `認得陷阱 ${pct(Math.min(CFG.MEMORY.evo.trapMax, Memory.trapAware + CFG.MEMORY.evo.trapLearn * s.snared))}` });
+    if (s.baited >= 2) out.push({ t: `誘餌上鉤率剩 ${pct(CFG.BUILD.bait.chance * (1 - Math.min(CFG.MEMORY.evo.baitMax, Memory.baitWise + CFG.MEMORY.evo.baitLearn * s.baited)))}` });
+    // 行為學習（沿用 v3）
+    const zoneSum = arr => { const z = {}; let t = 0; for (let i = 0; i < N; i++) if (arr[i]) { const k = this.zoneName(i); z[k] = (z[k] || 0) + arr[i]; t += arr[i]; } return [Object.entries(z).sort((a, b) => b[1] - a[1])[0], t]; };
+    const [pz, pt] = zoneSum(Memory.wPick);
+    if (pz && pt >= 2) out.push({ t: `常在${pz[0]}撿東西 → 那裡有埋伏` });
+    const ts = Memory.wTurn[0] + Memory.wTurn[1] + Memory.wTurn[2];
+    if (ts > 1.5) {
+      const l = Memory.wTurn[0] / ts, r = Memory.wTurn[2] / ts;
+      if (Math.max(l, r) > 0.4) { const side = r > l ? '右' : '左'; out.push({ t: `被追常往${side}拐 → 從${side}邊包` }); }
+    }
+    if (s.parts && !Memory.partGuard) out.push({ t: '零件旁開始有守衛' });
+    if (!out.length) out.push({ t: '沒學到新東西' });
+    return out.slice(0, 4);
+  },
+};
+
+/* 遊戲時間計時器（跟著遊戲速度、暫停時不走） */
+const gameTimers = [];
+function setTimeoutGame(fn, sec) { gameTimers.push({ fn, t: sec }); }
+function tickGameTimers(dt) { for (let k = gameTimers.length - 1; k >= 0; k--) { const g = gameTimers[k]; g.t -= dt; if (g.t <= 0) { gameTimers.splice(k, 1); g.fn(); } } }
+
+/* =====================================================================
+ * 表現層：Three.js
+ * ===================================================================== */
+const W2 = (x, y) => [x - C / 2, y - R / 2];
+const yawOf = a => Math.PI / 2 - a;
+
+const View = {
+  r: null, scene: null, cam: null, sun: null, shake: 0, zMap: new Map(), sMap: new Map(), scMap: new Map(), corpses: [], parts: [], shots: [],
+  camLook: null, camDir: null, camDist: 20, portrait: false, rocksMesh: null,
+
+  init() {
+    const cv = document.getElementById('cv');
+    this.r = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+    this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.r.shadowMap.enabled = true; this.r.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x1b1f2e);
+    this.scene.fog = new THREE.Fog(0x1a1e2c, 18, 36);   // 依鏡頭距離在 resize 裡調整
+    this.cam = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
+    this.camDir = new THREE.Vector3(0, 0.82, 0.57).normalize();
+    this.camLook = new THREE.Vector3();
+    this.scene.add(new THREE.HemisphereLight(0xcfd8ff, 0x2a2233, 0.75));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.75);
+    sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+    Object.assign(sun.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, near: 1, far: 50 });
+    this.scene.add(sun, sun.target); this.sun = sun;
+    this.makeArena(); this.makeShared(); this.makePlayer(); this.makePools(); this.makeOverlay(); this.makeRadio();
+    // 霧團貼圖：柔邊圓形
+    const fc = document.createElement('canvas'); fc.width = fc.height = 64; const fg = fc.getContext('2d');
+    const gr = fg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(190,200,230,0.9)'); gr.addColorStop(1, 'rgba(190,200,230,0)');
+    fg.fillStyle = gr; fg.fillRect(0, 0, 64, 64);
+    const ft = new THREE.CanvasTexture(fc); this.mist = [];
+    for (let k = 0; k < 34; k++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: ft, transparent: true, opacity: 0.1 + Math.random() * 0.08, depthWrite: false, fog: false }));
+      const a = Math.random() * 6.283, r = 6 + Math.random() * 10, s = 4 + Math.random() * 4;
+      sp.position.set(Math.cos(a) * r, 0.5 + Math.random() * 0.8, Math.sin(a) * r); sp.scale.set(s, s * 0.55, 1);
+      sp.userData = { vx: (Math.random() - 0.5) * 0.4, vz: (Math.random() - 0.5) * 0.4 };
+      this.scene.add(sp); this.mist.push(sp);
+    }
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  },
+  resize() {
+    const w = window.innerWidth, h = window.innerHeight;
+    this.r.setSize(w, h, false);
+    this.cam.aspect = w / h; this.cam.updateProjectionMatrix();
+    this.portrait = h > w; Game.portrait = this.portrait;
+    this.camDir.set(this.portrait ? 0.57 : 0, 0.82, this.portrait ? 0 : 0.57).normalize();
+    const want = this.portrait ? 12 : 19;
+    const hf = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(this.cam.fov / 2)) * this.cam.aspect);
+    this.camDist = clamp((want / 2) / Math.tan(hf / 2), 11, 28);
+    this.scene.fog.near = this.camDist * 0.9; this.scene.fog.far = this.camDist * 1.55;   // 畫面上緣（遠處）漸漸沒入霧裡
+    UI.sizeMinimap && UI.sizeMinimap();
+  },
+
+  makeArena() {
+    // 地板：重複貼圖（2x2 格一張），大地圖也不吃記憶體
+    const px = 64, cv = document.createElement('canvas'); cv.width = cv.height = px * 2;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#2b3150'; g.fillRect(0, 0, px * 2, px * 2);
+    g.fillStyle = 'rgba(255,255,255,.025)'; g.fillRect(px, 0, px, px); g.fillRect(0, px, px, px);
+    g.strokeStyle = 'rgba(150,170,235,.5)'; g.lineWidth = 2; g.strokeRect(0, 0, px, px); g.strokeRect(px, 0, px, px); g.strokeRect(0, px, px, px); g.strokeRect(px, px, px, px);
+    const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(C / 2, R / 2); tex.anisotropy = 4;
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(C, R), new THREE.MeshLambertMaterial({ map: tex }));
+    floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; this.scene.add(floor);
+    const out = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshLambertMaterial({ color: 0x20243a }));
+    out.rotation.x = -Math.PI / 2; out.position.y = -0.02; this.scene.add(out);
+    const wm = new THREE.MeshLambertMaterial({ color: 0x4a3c3e });   // 外牆壓暗，配合霧氣
+    const mk = (w, d, x, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), wm); m.position.set(x, 0.55, z); m.castShadow = m.receiveShadow = true; this.scene.add(m); };
+    mk(C + 2, 1, 0, -R / 2 - 0.5); mk(C + 2, 1, 0, R / 2 + 0.5); mk(1, R, -C / 2 - 0.5, 0); mk(1, R, C / 2 + 0.5, 0);
+    this.marker = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.32, 24), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.7, depthWrite: false }));
+    this.marker.rotation.x = -Math.PI / 2; this.marker.position.y = 0.03; this.scene.add(this.marker);
+  },
+  /** 廢墟：用 InstancedMesh 一次畫完，高低、顏色各不同 */
+  buildRocks() {
+    if (this.rocksMesh) { this.scene.remove(this.rocksMesh); this.rocksMesh.geometry.dispose(); }
+    let n = 0; for (let i = 0; i < N; i++) if (Grid.rock[i]) n++;
+    const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, n));
+    const mat = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color();
+    let k = 0;
+    for (let i = 0; i < N; i++) {
+      if (!Grid.rock[i]) continue;
+      const h = 0.5 + hash01(i, 7) * 0.7,   // 不要太高，免得擋住角色
+      [x, z] = W2(ix(i) + 0.5, iy(i) + 0.5);
+      mat.compose(new THREE.Vector3(x, h / 2, z), q, new THREE.Vector3(0.98, h, 0.98));
+      m.setMatrixAt(k, mat);
+      col.setHSL(0.6 + hash01(i, 3) * 0.08, 0.12, 0.26 + hash01(i, 5) * 0.1); m.setColorAt(k, col);
+      k++;
+    }
+    m.count = k; m.castShadow = m.receiveShadow = true;
+    m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    this.scene.add(m); this.rocksMesh = m;
+    // 矮牆：比廢墟矮很多，看得出來可以翻
+    if (this.lowMesh) { this.scene.remove(this.lowMesh); this.lowMesh.geometry.dispose(); }
+    let nl = 0; for (let i = 0; i < N; i++) if (Grid.low[i]) nl++;
+    const lm = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial({ color: 0xffffff }), Math.max(1, nl));
+    let kl = 0;
+    for (let i = 0; i < N; i++) {
+      if (!Grid.low[i]) continue;
+      const [x, z] = W2(ix(i) + 0.5, iy(i) + 0.5);
+      mat.compose(new THREE.Vector3(x, 0.2, z), q, new THREE.Vector3(0.96, 0.4, 0.96));
+      lm.setMatrixAt(kl, mat); col.setHSL(0.08, 0.12, 0.42 + hash01(i, 9) * 0.08); lm.setColorAt(kl, col); kl++;
+    }
+    lm.count = kl; lm.castShadow = lm.receiveShadow = true;
+    lm.instanceMatrix.needsUpdate = true; if (lm.instanceColor) lm.instanceColor.needsUpdate = true;
+    this.scene.add(lm); this.lowMesh = lm;
+  },
+  makeRadio() {
+    const g = new THREE.Group(), L = c => new THREE.MeshLambertMaterial({ color: c });
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.9), L(0x45506b)); base.position.y = 0.25; base.castShadow = true; g.add(base);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 2.4, 6), L(0xb7bccb)); mast.position.set(0.3, 1.5, 0); mast.castShadow = true; g.add(mast);
+    this.radioLight = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff4040 })); this.radioLight.position.set(0.3, 2.75, 0); g.add(this.radioLight);
+    this.radioZone = new THREE.Mesh(new THREE.RingGeometry(CFG.EVAC.radius - 0.08, CFG.EVAC.radius, 64), new THREE.MeshBasicMaterial({ color: 0x6fdc8c, transparent: true, opacity: 0, depthWrite: false }));
+    this.radioZone.rotation.x = -Math.PI / 2; this.radioZone.position.y = 0.03; g.add(this.radioZone);
+    this.radioBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 14, 16, 1, true), new THREE.MeshBasicMaterial({ color: 0x6fdc8c, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    this.radioBeam.position.y = 7; g.add(this.radioBeam);
+    const [x, z] = W2(RADIO.x, RADIO.y); g.position.set(x, 0, z); this.scene.add(g);
+  },
+  makeShared() {
+    const L = c => new THREE.MeshLambertMaterial({ color: c });
+    this.G = {
+      leg: new THREE.BoxGeometry(0.13, 0.3, 0.13), torso: new THREE.BoxGeometry(0.38, 0.34, 0.24),
+      head: new THREE.BoxGeometry(0.36, 0.33, 0.33), hair: new THREE.BoxGeometry(0.38, 0.12, 0.35),
+      arm: new THREE.BoxGeometry(0.1, 0.1, 0.36), bar: new THREE.PlaneGeometry(0.6, 0.07),
+      cone: new THREE.ConeGeometry(0.09, 0.22, 6), cube: new THREE.BoxGeometry(1, 1, 1), part: new THREE.BoxGeometry(0.07, 0.07, 0.07),
+      crate: new THREE.BoxGeometry(0.36, 0.3, 0.36), torus: new THREE.TorusGeometry(0.22, 0.07, 8, 16),
+      beam: new THREE.CylinderGeometry(0.22, 0.22, 12, 12, 1, true), ring: new THREE.RingGeometry(0.4, 0.5, 24),
+    };
+    this.M = {
+      jeans: L(0x3c4f7a), skin: L(0x93ad6c), hair: L(0x2a2522),
+      shirt: { rusher: L(0xd9483f), pathfinder: L(0xf0c94a), breaker: L(0x9b62d9), vaulter: L(0x34d1c0) },
+      stuck: new THREE.MeshBasicMaterial({ color: 0xffd34d }), dust: new THREE.MeshBasicMaterial({ color: 0xd8dbe4 }),
+      obstacle: L(0x3a3f52), stripe: L(0xe9a23b),
+      barBg: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6, depthTest: false }),
+      barFg: new THREE.MeshBasicMaterial({ color: 0x7be08f, depthTest: false }),
+      alert: new THREE.MeshBasicMaterial({ color: 0xff3b30 }),
+      wall: L(0x9aa0ae), wallTop: L(0x7d8393), turretBase: L(0x39445c), turret: L(0x4d9bf0), barrel: L(0xcfe4ff),
+      trap: L(0xa8713f), spike: L(0x5a3a1f), bait: L(0xb8452f), meatFat: L(0xe9a48c), bone: L(0xf1e9d6),
+      blood: new THREE.MeshBasicMaterial({ color: 0x6cff5a }), gold: new THREE.MeshBasicMaterial({ color: 0xf2cb52 }),
+      crate: L(0xc89a3c), crateTop: L(0xf2cb52), partM: new THREE.MeshBasicMaterial({ color: 0x5fe0ff }),
+      beam: new THREE.MeshBasicMaterial({ color: 0x5fe0ff, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }),
+      goldRing: new THREE.MeshBasicMaterial({ color: 0xf2cb52, transparent: true, opacity: 0.45, depthWrite: false }),
+    };
+  },
+  makeZombie(z) {
+    const G = this.G, M = this.M, g = new THREE.Group(); g.rotation.order = 'YXZ';
+    const body = new THREE.Group(); g.add(body);
+    const add = (geo, mat, x, y, zz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, zz); m.castShadow = true; body.add(m); return m; };
+    const l1 = add(G.leg, M.jeans, 0.1, 0.15, 0), l2 = add(G.leg, M.jeans, -0.1, 0.15, 0);
+    add(G.torso, M.shirt[z.type], 0, 0.47, 0);
+    const head = add(G.head, M.skin, 0, 0.81, 0.02); add(G.hair, M.hair, 0, 0.97, 0);
+    const a1 = add(G.arm, M.skin, 0.24, 0.56, 0.16), a2 = add(G.arm, M.skin, -0.24, 0.56, 0.16);
+    const s = z.def.scale; body.scale.setScalar(s);
+    if (z.type === 'vaulter') { const band = add(G.hair, M.shirt.vaulter, 0, 0.88, 0.01); band.scale.set(1.04, 0.35, 1.04); }   // 跑酷殭屍：頭帶
+    if (z.type === 'pathfinder') { const pack = add(G.torso, M.hair, 0, 0.5, -0.18); pack.scale.set(0.7, 0.8, 0.4); }          // 繞路殭屍：背包
+    const alert = new THREE.Mesh(G.cone, M.alert); alert.rotation.x = Math.PI; alert.position.y = 1.4 * s; alert.visible = false; g.add(alert);
+    this.scene.add(g);
+    return { g, body, head, l1, l2, a1, a2, alert, phase: Math.random() * 6, hop: 0 };
+  },
+  makePlayer() {
+    const L = c => new THREE.MeshLambertMaterial({ color: c });
+    const g = new THREE.Group(), add = (geo, mat, x, y, z, p = g) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.castShadow = true; p.add(m); return m; };
+    // 跑酷者：橘色帽 T、深色長褲、白球鞋、小背包；手腳各有關節可以擺動
+    const hoodie = L(0xf07a2e), pants = L(0x2b3142), skin = L(0xe2b48c), shoe = L(0xf2f2f2), dark = L(0x1e222e);
+    const limb = (x, y, len, mat, foot) => {
+      const piv = new THREE.Group(); piv.position.set(x, y, 0); g.add(piv);
+      add(new THREE.BoxGeometry(0.1, len, 0.1), mat, 0, -len / 2, 0, piv);
+      if (foot) add(new THREE.BoxGeometry(0.12, 0.06, 0.18), shoe, 0, -len, 0.03, piv);
+      return piv;
+    };
+    const legL = limb(0.08, 0.3, 0.27, pants, true), legR = limb(-0.08, 0.3, 0.27, pants, true);
+    add(new THREE.BoxGeometry(0.32, 0.34, 0.2), hoodie, 0, 0.47, 0);                     // 帽 T 身體
+    add(new THREE.BoxGeometry(0.22, 0.24, 0.1), dark, 0, 0.5, -0.14);                    // 背包
+    add(new THREE.SphereGeometry(0.15, 12, 10), skin, 0, 0.78, 0.01);                    // 頭
+    const hood = add(new THREE.SphereGeometry(0.17, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), hoodie, 0, 0.8, -0.02); hood.rotation.x = -0.35;   // 帽兜
+    add(new THREE.BoxGeometry(0.2, 0.05, 0.04), dark, 0, 0.8, 0.14);                     // 頭帶
+    const armL = limb(0.21, 0.6, 0.27, hoodie, false), armR = limb(-0.21, 0.6, 0.27, hoodie, false);
+    this.scene.add(g);
+    const wave = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 40),
+      new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    wave.rotation.x = -Math.PI / 2; wave.position.y = 0.06; this.scene.add(wave);
+    const ready = new THREE.Mesh(new THREE.RingGeometry(0.4, 0.47, 32), new THREE.MeshBasicMaterial({ color: 0x9fd6ff, transparent: true, opacity: 0, depthWrite: false }));
+    ready.rotation.x = -Math.PI / 2; ready.position.y = 0.04; this.scene.add(ready);
+    this.P = { g, armL, armR, legL, legR, wave, ready, runPh: 0 };
+  },
+  makePools() {
+    for (let k = 0; k < 90; k++) { const m = new THREE.Mesh(this.G.part, this.M.blood); m.visible = false; this.scene.add(m); this.parts.push({ m, t: 0, vx: 0, vy: 0, vz: 0 }); }
+    for (let k = 0; k < 14; k++) {
+      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+      const l = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xcfe4ff, transparent: true, opacity: 0 }));
+      this.scene.add(l); this.shots.push({ l, t: 0 });
+    }
+    const pg = new THREE.Group();
+    const tor = new THREE.Mesh(this.G.torus, this.M.partM); tor.position.y = 0.55; pg.add(tor);
+    const beam = new THREE.Mesh(this.G.beam, this.M.beam); beam.position.y = 6; pg.add(beam);
+    const ring = new THREE.Mesh(this.G.ring, new THREE.MeshBasicMaterial({ color: 0x5fe0ff, transparent: true, opacity: 0.6, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; pg.add(ring);
+    pg.visible = false; this.scene.add(pg); this.partMesh = { g: pg, tor, ring };
+  },
+  makeOverlay() {
+    this.ovCv = document.createElement('canvas'); this.ovCv.width = C * 8; this.ovCv.height = R * 8;
+    this.ovTex = new THREE.CanvasTexture(this.ovCv); this.ovTex.magFilter = THREE.NearestFilter;
+    this.ov = new THREE.Mesh(new THREE.PlaneGeometry(C, R), new THREE.MeshBasicMaterial({ map: this.ovTex, transparent: true, depthWrite: false }));
+    this.ov.rotation.x = -Math.PI / 2; this.ov.position.y = 0.015; this.ov.visible = false; this.scene.add(this.ov);
+  },
+  drawOverlay() {
+    const g = this.ovCv.getContext('2d'); g.clearRect(0, 0, C * 8, R * 8);
+    let hm = 0; for (let i = 0; i < N; i++) hm = Math.max(hm, Memory.heat(i));
+    for (let i = 0; i < N; i++) {
+      const d = Memory.danger[i], h = hm ? Memory.heat(i) / hm : 0;
+      if (h > 0.06) { g.fillStyle = `rgba(190,90,255,${Math.min(0.75, 0.15 + h * 0.7)})`; g.fillRect(ix(i) * 8, iy(i) * 8, 8, 8); }
+      if (d > 0.1) { g.fillStyle = `rgba(255,60,50,${Math.min(0.7, 0.12 + d * 0.1)})`; g.fillRect(ix(i) * 8, iy(i) * 8, 8, 8); }
+      if (Memory.stuck[i] > 0.2) { g.fillStyle = `rgba(255,190,60,${Math.min(0.8, 0.3 + Memory.stuck[i] * 0.15)})`; g.fillRect(ix(i) * 8, iy(i) * 8, 8, 8); }
+    }
+    this.ovTex.needsUpdate = true;
+  },
+  makeStructure(type) {
+    const G = this.G, M = this.M, g = new THREE.Group(), add = (mat, sx, sy, sz, y, p = g) => { const m = new THREE.Mesh(G.cube, mat); m.scale.set(sx, sy, sz); m.position.y = y; m.castShadow = m.receiveShadow = true; p.add(m); return m; };
+    const o = { g, type };
+    if (type === 'obstacle') {           // 矮路障：玩家跨得過的高度
+      o.body = new THREE.Group(); g.add(o.body);
+      add(M.obstacle, 0.9, 0.38, 0.5, 0.19, o.body);
+      for (let k = 0; k < 3; k++) { const st = add(M.stripe, 0.12, 0.3, 0.52, 0.2, o.body); st.position.x = -0.3 + k * 0.3; }
+    } else if (type === 'trap') {
+      add(M.trap, 0.82, 0.05, 0.82, 0.025);
+      for (let k = 0; k < 4; k++) { const s = add(M.spike, 0.1, 0.16, 0.1, 0.1); s.position.x = (k % 2 ? 0.2 : -0.2); s.position.z = (k < 2 ? 0.2 : -0.2); }
+    } else {
+      // 一塊帶骨的肉
+      o.ball = new THREE.Group(); o.ball.position.y = 0.25; g.add(o.ball);
+      const meat = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), M.bait); meat.scale.set(1.25, 0.8, 1); meat.castShadow = true; o.ball.add(meat);
+      const fat = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), M.meatFat); fat.position.set(0.08, 0.1, 0.1); o.ball.add(fat);
+      const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.34, 8), M.bone); bone.rotation.z = Math.PI / 2; bone.position.x = 0.36; o.ball.add(bone);
+      for (const dz of [-0.05, 0.05]) { const k = new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6), M.bone); k.position.set(0.53, 0, dz); o.ball.add(k); }
+    }
+    this.scene.add(g); return o;
+  },
+  makeScrap() {
+    const g = new THREE.Group(), G = this.G, M = this.M;
+    const a = new THREE.Mesh(G.crate, M.crate); a.position.y = 0.15; a.castShadow = true; g.add(a);
+    const b = new THREE.Mesh(G.crate, M.crateTop); b.scale.setScalar(0.7); b.position.set(0.06, 0.4, 0.04); b.rotation.y = 0.5; b.castShadow = true; g.add(b);
+    const ring = new THREE.Mesh(G.ring, M.goldRing); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; g.add(ring);
+    this.scene.add(g); return { g, b, ring };
+  },
+  burst(x, y, mat, n, up) {
+    for (let k = 0; k < n; k++) {
+      const p = this.parts.find(q => q.t <= 0); if (!p) break;
+      const a = Math.random() * 6.28, s = 1 + Math.random() * 2.5, [wx, wz] = W2(x, y);
+      p.t = 0.6; p.m.material = mat; p.m.visible = true; p.m.position.set(wx, 0.5, wz);
+      p.vx = Math.cos(a) * s; p.vz = Math.sin(a) * s; p.vy = up + Math.random() * 2;
+    }
+  },
+
+  bindFX() {
+    FX.hit = (z, dir) => {
+      if (Feel.shake) this.shake = Math.max(this.shake, 0.12);
+      if (!Feel.hitfx) return;
+      const [wx, wz] = W2(z.x, z.y);
+      for (let k = 0; k < 7; k++) {
+        const p = this.parts.find(q => q.t <= 0); if (!p) break;
+        const a = (dir ?? Math.random() * 6.28) + (Math.random() - 0.5) * 1.6, s = 2 + Math.random() * 3;
+        p.t = 0.45; p.m.material = this.M.dust; p.m.visible = true; p.m.position.set(wx, 0.6, wz);
+        p.vx = Math.cos(a) * s; p.vz = Math.sin(a) * s; p.vy = 1.5 + Math.random() * 2.5;
+      }
+    };
+    // 殭屍殺不死：跟丟你之後慢慢沉進地面散掉
+    FX.despawn = z => { const o = this.zMap.get(z.id); if (!o) return; this.zMap.delete(z.id); o.alert.visible = false; this.corpses.push({ o, t: 0 }); };
+    FX.stuck = () => {};
+    FX.vault = e => { if (Feel.hitfx) this.burst(e.x, e.y, this.M.dust, 4, 1); };
+    FX.boost = e => { if (Feel.hitfx) this.burst(e.x, e.y, this.M.dust, 6, 1.5); };
+    FX.hurt = () => {
+      if (Feel.shake) this.shake = Math.max(this.shake, 0.35);
+      const f = document.getElementById('flash'); f.style.transition = 'none'; f.style.opacity = '1';
+      requestAnimationFrame(() => { f.style.transition = 'opacity .45s'; f.style.opacity = '0'; });
+    };
+    FX.shove = () => { this.P.waveVis = 1; if (Feel.shake) this.shake = Math.max(this.shake, 0.2); };
+    FX.broke = () => { if (Feel.shake) this.shake = Math.max(this.shake, 0.18); };
+    FX.pickup = s => { this.burst(s.x, s.y, this.M.gold, 8, 2); UI.msg(`+${s.value} 材料`); };
+    FX.part = (p, n) => { this.burst(p.x, p.y, this.M.partM, 16, 3); if (n < CFG.PARTS.goal) UI.msg(`找到零件 ${n}/${CFG.PARTS.goal}`); if (Feel.slowmo) Game.slowT = 0.35; };
+    FX.horde = (dir, warn) => {
+      const d = this.dirName(dir);
+      if (warn) UI.alarm(`屍潮要來了，從${d}！`); else UI.alarm(`屍潮從${d}湧來`);
+      UI.hordeDir = dir; UI.hordeFlash = warn ? CFG.HORDE.warn + 4 : 4;
+    };
+    FX.report = (n, lines) => { UI.showReport(n, lines); this.drawOverlay(); };
+    FX.broke = () => { if (Feel.shake) this.shake = Math.max(this.shake, 0.15); };
+    FX.evac = k => { UI.alarm(k === 'start' ? '救援呼叫成功！撐 30 秒，去哪都行' : '直升機降落了！衝回無線電'); if (Feel.shake) this.shake = 0.3; };
+    FX.msg = m => UI.msg(m);
+    FX.over = win => UI.over(win);
+  },
+  /** 邏輯方向 → 螢幕上的方位文字（直向時地圖轉了 90°） */
+  dirName(a) {
+    const k = ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
+    return ['右邊', '右下', '下方', '左下', '左邊', '左上', '上方', '右上'][(k + (this.portrait ? 2 : 0)) % 8];
+  },
+
+  sync(dt, real) {
+    const Pd = Game.player, P = this.P, t = performance.now() / 1000;
+    const [px, pz] = W2(Pd.x, Pd.y);
+    P.hop = (P.hop || 0) + ((Pd.vaulting ? 0.34 : 0) - (P.hop || 0)) * Math.min(1, real * 14);
+    P.g.position.set(px, P.hop + (Math.hypot(Pd.vx, Pd.vy) > 0.5 ? Math.abs(Math.sin(t * 14)) * 0.05 : 0), pz);
+    P.yaw = P.yaw === undefined ? yawOf(Pd.face) : lerpAngle(P.yaw, yawOf(Pd.face), 1 - Math.exp(-(Pd.shoveT > 0 ? 30 : 14) * real));
+    P.g.rotation.y = P.yaw;
+    P.g.visible = !(Pd.iframe > 0 && Math.floor(t * 20) % 2 === 0);
+    const S = CFG.PLAYER, sk = Pd.shoveT > 0 ? 1 - Pd.shoveT / S.shoveTime : 1;
+    // 跑步擺手擺腳；推開時雙手往前推；翻越時收腿
+    const spd = Math.hypot(Pd.vx, Pd.vy);
+    P.runPh += real * (4 + spd * 4);
+    const sw = Math.min(1, spd / 2) * Math.sin(P.runPh) * 0.9;
+    P.legL.rotation.x = Pd.vaulting ? -1.1 : sw; P.legR.rotation.x = Pd.vaulting ? -0.4 : -sw;
+    if (Pd.shoveT > 0) { const push = -1.5 * Math.sin(sk * Math.PI); P.armL.rotation.x = push; P.armR.rotation.x = push; }
+    else { P.armL.rotation.x = -sw * 0.9; P.armR.rotation.x = sw * 0.9; }
+    P.wave.position.set(px, 0.06, pz); P.wave.scale.setScalar(0.3 + sk * (S.shoveRange + 0.2));
+    P.wave.material.opacity = Pd.shoveT > 0 && P.waveVis ? 0.7 * (1 - sk) : 0;
+    P.ready.position.set(px, 0.04, pz);
+    P.ready.material.opacity = !S.shoveEnabled ? 0 : Pd.shoveCd <= 0 ? 0.45 + Math.sin(t * 5) * 0.12 : 0.1 * (1 - Pd.shoveCd / S.shoveCd);
+    if (Pd.dest) { const [mx, mz] = W2(Pd.dest.x, Pd.dest.y); this.marker.visible = true; this.marker.position.x = mx; this.marker.position.z = mz; this.marker.scale.setScalar(1 + Math.sin(t * 6) * 0.1); }
+    else this.marker.visible = false;
+
+    for (const z of Game.zombies) {
+      let o = this.zMap.get(z.id);
+      if (!o) { o = this.makeZombie(z); this.zMap.set(z.id, o); }
+      const [wx, wz] = W2(z.x, z.y);
+      o.hop += ((z.vaulting ? 0.32 : 0) - o.hop) * Math.min(1, real * 14);   // 跨越時往上跳
+      o.g.position.set(wx, o.hop, wz);
+      o.yaw = o.yaw === undefined ? yawOf(z.dir) : lerpAngle(o.yaw, yawOf(z.dir), 1 - Math.exp(-8 * real * UI.speed));
+      o.g.rotation.y = o.yaw;
+      o.phase += dt * (z.moving ? z.def.speed * 6 : z.attacking ? 14 : 2);
+      const sw = z.moving ? Math.sin(o.phase) * 0.5 : 0;
+      o.l1.rotation.x = sw; o.l2.rotation.x = -sw;
+      o.a1.rotation.x = z.attacking ? Math.sin(o.phase) * 0.6 - 0.2 : -0.1 + Math.sin(o.phase * 0.5) * 0.08;
+      o.a2.rotation.x = z.attacking ? -Math.sin(o.phase) * 0.6 - 0.2 : -0.1 - Math.sin(o.phase * 0.5) * 0.08;
+      o.body.rotation.z = z.moving ? Math.sin(o.phase * 0.5) * 0.08 : 0;
+      const f = z.flash > 0 ? 1.18 : 1; o.body.scale.set(z.def.scale * f, z.def.scale / f, z.def.scale * f);
+      o.head.position.y = z.waiting ? 0.81 + Math.sin(t * 2 + o.phase) * 0.02 : 0.81;
+      // 頭上標記：紅 = 發現你；黃 = 被障礙卡住
+      o.alert.visible = z.alertT > 0 || z.stuckMark > 0 || z.trapMark > 0; o.alert.material = z.alertT > 0 ? this.M.alert : this.M.stuck;
+      o.alert.position.y = 1.4 * z.def.scale + Math.sin(t * 12) * 0.05;
+      if (z.stuckMark > 0) o.body.position.x = Math.sin(t * 40) * 0.03; else o.body.position.x = 0;
+    }
+    for (let k = this.corpses.length - 1; k >= 0; k--) {
+      const c = this.corpses[k], g = c.o.g; c.t += real;
+      g.position.y = -c.t * 1.4;
+      if (c.t > 0.9) { this.scene.remove(g); this.corpses.splice(k, 1); }
+    }
+    for (let i = 0; i < N; i++) {
+      const s = Grid.cells[i]; let o = this.sMap.get(i);
+      if (o && (!s || o.type !== s.type)) { this.scene.remove(o.g); this.sMap.delete(i); o = null; }
+      if (!s) continue;
+      if (!o) { o = this.makeStructure(s.type); const [wx, wz] = W2(ix(i) + 0.5, iy(i) + 0.5); o.g.position.set(wx, 0, wz); o.born = t; this.sMap.set(i, o); }
+      const pop = Math.min(1, (t - o.born) / 0.18); o.g.scale.setScalar(0.4 + 0.6 * pop + Math.sin(pop * Math.PI) * 0.15);
+      if (o.body) { const k = s.hp / CFG.BUILD.obstacle.hp; o.body.scale.y = 0.45 + 0.55 * k; }
+      if (o.ball) {
+        const k = s.from ? (Game.time - s.t0) / 0.35 : 1;
+        if (k < 1) {                                          // 丟出去的拋物線
+          const [fx, fz] = W2(s.from.x, s.from.y), [tx, tz] = W2(ix(i) + 0.5, iy(i) + 0.5);
+          o.g.position.set(fx + (tx - fx) * k, 0, fz + (tz - fz) * k); o.ball.position.y = 0.25 + Math.sin(k * Math.PI) * 1.3; o.ball.rotation.z = k * 6;
+        } else {
+          const [tx, tz] = W2(ix(i) + 0.5, iy(i) + 0.5); o.g.position.set(tx, 0, tz);
+          o.ball.position.y = 0.2; o.ball.rotation.z = 0; o.ball.rotation.y = i;
+          o.ball.scale.setScalar(s.life < 3 ? 0.5 + 0.5 * s.life / 3 : 1);   // 快過期時縮小
+        }
+      }
+      if (s.type === 'trap') {
+        o.g.scale.y *= 0.35 + 0.65 * s.uses / CFG.BUILD.trap.uses;   // 尖刺隨使用次數磨平
+        if (s.flash > 0) { s.flash -= real; const k = 1 + 0.35 * Math.abs(Math.sin(t * 18)); o.g.scale.x *= k; o.g.scale.z *= k; }   // 被殭屍識破：閃一下
+      }
+    }
+    // 物資
+    const alive = new Set();
+    for (const s of Game.scraps) {
+      alive.add(s.id);
+      let o = this.scMap.get(s.id);
+      if (!o) { o = this.makeScrap(); const [wx, wz] = W2(s.x, s.y); o.g.position.set(wx, 0, wz); this.scMap.set(s.id, o); }
+      o.b.position.y = 0.4 + Math.sin(t * 3 + s.id) * 0.05; o.ring.scale.setScalar(1 + Math.sin(t * 4 + s.id) * 0.1);
+    }
+    for (const [id, o] of this.scMap) if (!alive.has(id)) { this.scene.remove(o.g); this.scMap.delete(id); }
+    // 零件
+    const pm = this.partMesh;
+    if (Game.part) { const [wx, wz] = W2(Game.part.x, Game.part.y); pm.g.visible = true; pm.g.position.set(wx, 0, wz); pm.tor.rotation.y = t * 2; pm.tor.rotation.x = Math.sin(t) * 0.4; pm.tor.position.y = 0.55 + Math.sin(t * 3) * 0.08; pm.ring.scale.setScalar(1 + Math.sin(t * 5) * 0.15); }
+    else pm.g.visible = false;
+    // 無線電
+    const ev = Game.evac;
+    this.radioLight.material.color.setHex(ev === 'none' ? 0xff4040 : 0x6fdc8c);
+    this.radioLight.visible = ev === 'none' ? Math.floor(t * 2) % 2 === 0 : true;
+    this.radioZone.material.opacity = ev === 'ready' || ev === 'pickup' ? 0.5 + Math.sin(t * 4) * 0.2 : 0;
+    this.radioZone.scale.setScalar(ev === 'pickup' ? CFG.EVAC.pickupR / CFG.EVAC.radius : 1);
+    this.radioBeam.material.opacity = ev === 'ready' || ev === 'pickup' ? 0.22 : 0.06;
+
+    for (const p of this.parts) {
+      if (p.t <= 0) continue;
+      p.t -= dt; p.vy -= 12 * dt;
+      p.m.position.x += p.vx * dt; p.m.position.y = Math.max(0.03, p.m.position.y + p.vy * dt); p.m.position.z += p.vz * dt;
+      if (p.t <= 0) p.m.visible = false;
+    }
+    for (const s of this.shots) { if (s.t > 0) s.t -= real; s.l.material.opacity = Math.max(0, s.t / 0.08); }
+    this.ov.visible = UI.mem;
+
+    // 鏡頭與陰影跟隨
+    const ext = this.portrait ? [R / 2 - 5, C / 2 - 6] : [C / 2 - 8.5, R / 2 - 4.5];
+    let tx, tz;
+    if (this.portrait) { tx = clamp(px, -ext[1], ext[1]) + 1.6; tz = clamp(pz, -ext[0], ext[0]); }
+    else { tx = clamp(px, -ext[0], ext[0]); tz = clamp(pz, -ext[1], ext[1]) + 1.4; }
+    const kc = Math.min(1, real * 6);
+    this.camLook.x += (tx - this.camLook.x) * kc; this.camLook.z += (tz - this.camLook.z) * kc;
+    this.cam.position.copy(this.camDir).multiplyScalar(this.camDist).add(this.camLook);
+    if (this.shake > 0) {
+      const s = this.shake * this.shake;
+      this.cam.position.x += (Math.random() - 0.5) * s * 1.6; this.cam.position.y += (Math.random() - 0.5) * s; this.cam.position.z += (Math.random() - 0.5) * s * 1.6;
+      this.shake = Math.max(0, this.shake - real * 1.6);
+    }
+    this.cam.lookAt(this.camLook);
+    // 飄動的霧團：在玩家周圍一圈慢慢漂，離太遠就換到另一邊
+    for (const m of this.mist) {
+      m.position.x += m.userData.vx * real; m.position.z += m.userData.vz * real;
+      const dx = m.position.x - this.camLook.x, dz = m.position.z - this.camLook.z;
+      if (Math.hypot(dx, dz) > 17) { const a = Math.random() * 6.283, r = 9 + Math.random() * 6; m.position.x = this.camLook.x + Math.cos(a) * r; m.position.z = this.camLook.z + Math.sin(a) * r; }
+    }
+    if (Pd.boostT > 0 && Math.random() < 0.5) this.burst(Pd.x, Pd.y, this.M.dust, 1, 0.4);   // 加速時腳下揚塵
+    this.sun.target.position.copy(this.camLook); this.sun.position.set(this.camLook.x - 6, 16, this.camLook.z + 8);
+    this.r.render(this.scene, this.cam);
+  },
+  /** 世界座標 → 螢幕座標（給指引箭頭用） */
+  toScreen(x, y, h = 0.5) {
+    const [wx, wz] = W2(x, y), v = new THREE.Vector3(wx, h, wz).project(this.cam);
+    return { x: (v.x + 1) / 2 * window.innerWidth, y: (1 - v.y) / 2 * window.innerHeight, behind: v.z > 1 };
+  },
+  pick(cx, cy) {
+    const v = new THREE.Vector2(cx / window.innerWidth * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
+    const rc = new THREE.Raycaster(); rc.setFromCamera(v, this.cam);
+    const hit = new THREE.Vector3();
+    if (!rc.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), hit)) return null;
+    return [hit.x + C / 2, hit.z + R / 2];
+  },
+};
+
+/* ============================== UI ============================== */
+const UI = {
+  speed: 1, mem: false, el: {}, tickT: 0, resetArm: 0, mmT: 0, hordeDir: 0, hordeFlash: 0, reportT: 0,
+  init() {
+    const $ = id => document.getElementById(id);
+    for (const id of ['vParts', 'vMat', 'pbar', 'pfill', 'vTime', 'ticker', 'report', 'rTitle', 'rBody', 'overlay', 'ocard', 'oTitle', 'oTag', 'oBody', 'obtn',
+                      'btnSpeed', 'btnMem', 'btnReset', 'builds', 'minimap', 'arPart', 'arRadio', 'evac', 'brainFill', 'brainStat']) this.el[id] = $(id);
+    const e = this.el;
+    e.builds.addEventListener('pointerdown', ev => { const b = ev.target.closest('.bld'); if (b) { ev.preventDefault(); Game.drop(b.dataset.b); this.sync(); } });
+    e.btnSpeed.addEventListener('click', () => this.cycleSpeed());
+    e.btnMem.addEventListener('click', () => this.toggleMem());
+    e.btnReset.addEventListener('click', () => {
+      if (Date.now() - this.resetArm < 2500) { this.resetArm = 0; e.btnReset.classList.remove('arm'); e.btnReset.textContent = '重置'; this.restart(true); }
+      else { this.resetArm = Date.now(); e.btnReset.classList.add('arm'); e.btnReset.textContent = '再按一次';
+        setTimeout(() => { if (Date.now() - this.resetArm >= 2400) { e.btnReset.classList.remove('arm'); e.btnReset.textContent = '重置'; } }, 2500); }
+    });
+    e.obtn.addEventListener('click', () => { if (Game.phase === 'over') this.restart(false); e.overlay.classList.add('hide'); Game.begin(); });
+    this.sizeMinimap();
+  },
+  restart(play) {
+    for (const o of View.zMap.values()) View.scene.remove(o.g);
+    for (const c of View.corpses) View.scene.remove(c.o.g);
+    View.zMap.clear(); View.corpses = []; gameTimers.length = 0;
+    Game.reset(); View.buildRocks(); View.drawOverlay(); this.hideReport();
+    if (play) { Game.begin(); this.el.overlay.classList.add('hide'); }
+    this.sync();
+  },
+  cycleSpeed() { this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 3 : 1; this.el.btnSpeed.textContent = `速度 ${this.speed}x`; this.el.btnSpeed.classList.toggle('on', this.speed > 1); },
+  toggleMem() { this.mem = !this.mem; this.el.btnMem.classList.toggle('on', this.mem); if (this.mem) { View.drawOverlay(); this.msg('紫：你常去的地方　橘：殭屍被卡住處　紅：陷阱'); } },
+  msg(m) { const t = this.el.ticker; if (!t) return; t.textContent = m; t.classList.remove('fade', 'alarm'); this.tickT = 2.4; },
+  alarm(m) { const t = this.el.ticker; if (!t) return; t.textContent = m; t.classList.remove('fade'); t.classList.add('alarm'); this.tickT = 4; },
+  showReport(n, lines) {
+    const e = this.el; e.rTitle.textContent = `屍群進化 #${n}`; e.rBody.textContent = '';
+    for (const l of lines) { if (!l.t) continue; const li = document.createElement('li'); li.textContent = l.t; if (l.c) li.className = l.c; e.rBody.appendChild(li); }
+    e.report.classList.remove('hide'); this.reportT = 5;
+  },
+  hideReport() { this.el.report.classList.add('hide'); this.reportT = 0; },
+  over(win) {
+    const e = this.el, m = Math.floor(Game.time / 60), s = Math.floor(Game.time % 60);
+    e.ocard.className = win ? 'win' : 'lose';
+    e.oTitle.textContent = win ? '救援到了' : '你被抓到了';
+    e.oTag.textContent = win ? `撐了 ${m}:${String(s).padStart(2, '0')}，成功撤離。` : `撐了 ${m}:${String(s).padStart(2, '0')}，找到 ${Game.parts}/${CFG.PARTS.goal} 個零件。`;
+    e.oBody.textContent = '';
+    const p = document.createElement('p');
+    p.textContent = (win ? '屍群進化了 ' + Memory.updates + ' 次，還是沒堵到你。' : '屍群進化了 ' + Memory.updates + ' 次。') + ' 最後的族群：' + Game.compositionLine();
+    e.oBody.appendChild(p);
+    e.obtn.textContent = '再玩一次';
+    e.overlay.classList.remove('hide');
+  },
+  sizeMinimap() {
+    const mm = this.el.minimap; if (!mm) return;
+    const port = window.innerHeight > window.innerWidth, sc = port || document.body.classList.contains('touch') ? 3 : 4;
+    const w = (port ? R : C) * sc, h = (port ? C : R) * sc, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    mm.width = w * dpr; mm.height = h * dpr; mm.style.width = w + 'px'; mm.style.height = h + 'px';
+    this.mmScale = sc; this.mmDpr = dpr; this.mmPort = port;
+  },
+  /** 小地圖：方向跟螢幕一致（直向時也轉 90°） */
+  drawMinimap() {
+    const mm = this.el.minimap, g = mm.getContext('2d'), sc = this.mmScale, port = this.mmPort;
+    g.setTransform(this.mmDpr, 0, 0, this.mmDpr, 0, 0);
+    const W = (port ? R : C) * sc, H = (port ? C : R) * sc;
+    g.clearRect(0, 0, W, H);
+    const map = (x, y) => port ? [(R - y) * sc, x * sc] : [x * sc, y * sc];
+    const cellTL = i => port ? map(ix(i), iy(i) + 1) : map(ix(i), iy(i));     // 格子在小地圖上的左上角
+    g.fillStyle = 'rgba(120,130,160,.55)';
+    for (let i = 0; i < N; i++) if (Grid.rock[i]) { const [a, b] = cellTL(i); g.fillRect(a, b, sc, sc); }
+    g.fillStyle = 'rgba(190,170,140,.45)';
+    for (let i = 0; i < N; i++) if (Grid.low[i]) { const [a, b] = cellTL(i); g.fillRect(a, b, sc, sc); }
+    for (let i = 0; i < N; i++) { const c = Grid.cells[i]; if (!c) continue; g.fillStyle = c.type === 'obstacle' ? '#e9a23b' : c.type === 'trap' ? '#a8713f' : '#f2cb52'; const [a, b] = cellTL(i); g.fillRect(a, b, sc, sc); }
+    const dot = (x, y, r, col) => { const [a, b] = map(x, y); g.fillStyle = col; g.beginPath(); g.arc(a, b, r, 0, 6.283); g.fill(); };
+    for (const s of Game.scraps) dot(s.x, s.y, 2, '#f2cb52');
+    dot(RADIO.x, RADIO.y, 3.5, Game.evac === 'none' ? '#8a93a8' : '#6fdc8c');
+    const zc = { rusher: '#ff5a4e', pathfinder: '#f0c94a', breaker: '#b77cf0', vaulter: '#34d1c0' };
+    for (const z of Game.zombies) dot(z.x, z.y, 1.7, zc[z.type]);
+    if (Game.part) dot(Game.part.x, Game.part.y, 3.5 + Math.sin(performance.now() / 150), '#5fe0ff');
+    dot(Game.player.x, Game.player.y, 3, '#ffffff');
+    if (this.hordeFlash > 0 && Math.floor(performance.now() / 250) % 2 === 0) {       // 屍潮方向：小地圖邊緣閃紅
+      const P = Game.player, [a, b] = map(P.x + Math.cos(this.hordeDir) * 14, P.y + Math.sin(this.hordeDir) * 14);
+      g.strokeStyle = '#ff3b30'; g.lineWidth = 3; g.beginPath(); g.arc(clamp(a, 4, W - 4), clamp(b, 4, H - 4), 6, 0, 6.283); g.stroke();
+    }
+  },
+  /** 指引箭頭：目標在畫面外時，貼著畫面邊緣指過去 */
+  placeArrow(el, x, y) {
+    const s = View.toScreen(x, y), w = window.innerWidth, h = window.innerHeight, m = 40;
+    const inside = !s.behind && s.x > m && s.x < w - m && s.y > 90 && s.y < h - 150;
+    if (inside) { el.style.display = 'none'; return; }
+    const cx = w / 2, cy = h / 2;
+    let dx = s.x - cx, dy = s.y - cy; if (s.behind) { dx = -dx; dy = -dy; }
+    const k = Math.min((w / 2 - m) / Math.abs(dx || 1e-3), (h / 2 - 120) / Math.abs(dy || 1e-3));
+    el.style.display = 'block';
+    el.style.transform = `translate(${cx + dx * k - 11}px, ${cy + dy * k - 11}px) rotate(${Math.atan2(dy, dx) + Math.PI / 2}rad)`;
+  },
+  tick(real) {
+    const e = this.el;
+    // 血條貼在角色腳下
+    if (Game.phase === 'play') { const s = View.toScreen(Game.player.x, Game.player.y, 0); e.pbar.style.display = 'block'; e.pbar.style.transform = `translate(${s.x}px, ${s.y + 14}px)`; }
+    else e.pbar.style.display = 'none';
+    if (this.tickT > 0) { this.tickT -= real; if (this.tickT <= 0) e.ticker.classList.add('fade'); }
+    if (this.reportT > 0) { this.reportT -= real; if (this.reportT <= 0) this.hideReport(); }
+    if (this.hordeFlash > 0) this.hordeFlash -= real;
+    this.mmT -= real; if (this.mmT <= 0) { this.mmT = 0.1; this.drawMinimap(); }
+    if (Game.part && Game.phase === 'play') this.placeArrow(e.arPart, Game.part.x, Game.part.y); else e.arPart.style.display = 'none';
+    if ((Game.evac === 'ready' || Game.evac === 'pickup') && Game.phase === 'play') this.placeArrow(e.arRadio, RADIO.x, RADIO.y); else e.arRadio.style.display = 'none';
+    if ((Game.evac === 'active' || Game.evac === 'pickup') && Game.phase === 'play') {
+      const pick = Game.evac === 'pickup';
+      e.evac.style.display = 'block'; e.evac.classList.toggle('out', pick);
+      e.evac.textContent = pick ? '直升機在等你！' : `救援 ${Math.ceil(Game.evacT)} 秒後抵達`;
+      const sm = document.createElement('small'); sm.textContent = pick ? '跟著綠色箭頭回到無線電' : '活下去，去哪都行'; e.evac.appendChild(sm);
+    } else e.evac.style.display = 'none';
+    this.sync();
+  },
+  sync() {
+    const e = this.el, P = Game.player; if (!e.vMat || !P) return;
+    e.vParts.textContent = `${Game.parts}/${CFG.PARTS.goal}`;
+    const m = Math.floor(Game.materials);
+    if (e.vMat.textContent !== String(m)) {
+      e.vMat.textContent = String(m);
+      for (const b of e.builds.children) {
+        const c = Game.costOf(b.dataset.b);
+        b.classList.toggle('poor', m < c);
+        const sm = b.querySelector('small'); if (sm.textContent !== c + ' 材料') sm.textContent = c + ' 材料';
+      }
+    }
+    e.pfill.style.width = (P.hp / CFG.PLAYER.hp * 100) + '%';
+    e.pbar.classList.toggle('low', P.hp <= 30); e.pbar.classList.toggle('full', P.hp >= CFG.PLAYER.hp);
+    e.vTime.textContent = `${Math.floor(Game.time / 60)}:${String(Math.floor(Game.time % 60)).padStart(2, '0')}`;
+    const bp = Math.min(1, Game.learnPoints() / CFG.MEMORY.evolveAt);       // 屍腦：下一次進化的進度
+    e.brainFill.style.width = (bp * 100) + '%'; e.brainStat.classList.toggle('full', bp >= 1);
+  },
+};
+
+/* ============================== 輸入 ============================== */
+const InputDOM = {
+  keys: {}, down: false, lastT: 0,
+  init() {
+    const cv = document.getElementById('cv');
+    const go = (x, y) => { const p = View.pick(x, y); if (p) Game.moveTo(p[0], p[1]); };
+    // 觸控裝置：左半邊是浮動虛擬搖桿（按哪裡、搖桿就出現在哪裡）；電腦：點地面移動
+    const touch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+    if (touch) document.body.classList.add('touch');
+    const stick = document.getElementById('stick'), knob = document.getElementById('knob'), RAD = 52;
+    const rest = () => { stick.classList.add('idle'); stick.style.left = (90 + (parseFloat(getComputedStyle(document.body).paddingLeft) || 0)) + 'px'; stick.style.top = (window.innerHeight - 100) + 'px'; knob.style.transform = ''; };
+    if (touch) { rest(); window.addEventListener('resize', () => { if (this.stickId === undefined) rest(); }); }
+    this.stickId = undefined;
+    const setStick = (cx, cy) => {
+      let dx = cx - this.sx, dy = cy - this.sy; const d = Math.hypot(dx, dy);
+      if (d > RAD) { dx *= RAD / d; dy *= RAD / d; }
+      knob.style.transform = `translate(${dx}px, ${dy}px)`;
+      let x = dx / RAD, y = dy / RAD;
+      if (Math.hypot(x, y) < 0.18) { x = 0; y = 0; }                 // 死區
+      if (Game.portrait) { const t = x; x = y; y = -t; }             // 直向時畫面轉了 90°
+      Input.kx = x; Input.ky = y;
+    };
+    cv.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (touch) {
+        if (this.stickId !== undefined || e.clientX > window.innerWidth * 0.55) return;   // 右半邊不當搖桿
+        this.stickId = e.pointerId; this.sx = e.clientX; this.sy = e.clientY;
+        stick.classList.remove('idle'); stick.style.left = this.sx + 'px'; stick.style.top = this.sy + 'px'; setStick(e.clientX, e.clientY);
+        return;
+      }
+      this.down = true; this.lastT = performance.now(); go(e.clientX, e.clientY);
+    });
+    cv.addEventListener('pointermove', e => {
+      if (touch) { if (e.pointerId === this.stickId) setStick(e.clientX, e.clientY); return; }
+      if (!this.down) return;
+      const now = performance.now(); if (now - this.lastT < 110) return;
+      this.lastT = now; go(e.clientX, e.clientY);
+    });
+    const release = e => {
+      this.down = false;
+      if (touch && e.pointerId === this.stickId) { this.stickId = undefined; Input.kx = 0; Input.ky = 0; rest(); }
+    };
+    window.addEventListener('pointerup', release);
+    window.addEventListener('pointercancel', release);
+    const map = { KeyW: [0, -1], ArrowUp: [0, -1], KeyS: [0, 1], ArrowDown: [0, 1], KeyA: [-1, 0], ArrowLeft: [-1, 0], KeyD: [1, 0], ArrowRight: [1, 0] };
+    // 直向時畫面轉了 90°，鍵盤方向也要跟著轉，按「上」才會往螢幕上方走
+    const upd = () => {
+      let x = 0, y = 0; for (const k in this.keys) if (this.keys[k] && map[k]) { x += map[k][0]; y += map[k][1]; }
+      if (Game.portrait) { const t = x; x = y; y = -t; }
+      Input.kx = x; Input.ky = y;
+    };
+    window.addEventListener('keydown', e => {
+      if (map[e.code]) { this.keys[e.code] = true; upd(); e.preventDefault(); return; }
+      const b = { Digit1: 'obstacle', Digit2: 'trap', Digit3: 'bait' }[e.code];
+      if (b) { Game.drop(b); UI.sync(); }
+      else if (e.code === 'KeyF') UI.cycleSpeed();
+      else if (e.code === 'KeyH') UI.toggleMem();
+      else if ((e.code === 'Enter' || e.code === 'Space') && !UI.el.overlay.classList.contains('hide')) UI.el.obtn.click();
+    });
+    window.addEventListener('keyup', e => { if (map[e.code]) { this.keys[e.code] = false; upd(); } });
+    window.addEventListener('blur', () => { this.keys = {}; upd(); });
+    document.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('contextmenu', e => e.preventDefault());
+  },
+};
+
+/* ============================== 主迴圈 ============================== */
+function boot() {
+  if (typeof THREE === 'undefined') { document.getElementById('oTag').textContent = '3D 函式庫載入失敗，請確認網路連線後重新整理。'; return; }
+  Game.reset();
+  UI.init(); View.init(); View.bindFX(); InputDOM.init();
+  View.buildRocks(); View.drawOverlay(); UI.sync();
+  let last = performance.now();
+  (function frame(now) {
+    const real = Math.min(0.05, (now - last) / 1000); last = now;
+    let dt = real;
+    if (Game.hitstop > 0) { Game.hitstop -= real; dt = 0; }
+    else if (Game.slowT > 0) { Game.slowT -= real; dt *= 0.3; }
+    for (let k = 0; k < UI.speed && dt > 0; k++) Game.update(dt);
+    View.sync(dt * UI.speed, real);
+    UI.tick(real);
+    requestAnimationFrame(frame);
+  })(last);
+}
+if (typeof document !== 'undefined') boot();
+if (typeof module !== 'undefined') module.exports = { CFG, Grid, Memory, Path, Game, Feel, FX, Input, idx, ix, iy, RADIO, gameTimers };
+</script>
+</body>
+</html>

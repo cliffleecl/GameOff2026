@@ -1,0 +1,22 @@
+{
+  "name": "brain-shift",
+  "version": "0.4.0",
+  "private": true,
+  "type": "module",
+  "description": "Brain Shift — 會學習的殭屍 × 跑酷逃生（Game Jam 主題：Shift）",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "sim": "node sim/sim.mjs",
+    "zip": "vite build && node scripts/zip-itch.mjs",
+    "itch": "vite build && node scripts/push-itch.mjs"
+  },
+  "dependencies": {
+    "three": "0.128.0"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1",
+    "vite": "^5.4.11"
+  }
+}

@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Brain Shift</title>
+<style>
+  :root{
+    --bg:#141824; --panel:#1d2232; --panel2:#262c40; --line:#343b54;
+    --ink:#e8e1d2; --dim:#9a9fb3;
+    --brain:#e88fa6;      /* 屍腦／記憶相關的強調色 */
+    --go:#e2763a;         /* 主要行動 */
+    --core:#5fd08a; --wall:#8e94a3; --turret:#4d9bf0; --trap:#a8713f; --bait:#f0c94a;
+    --danger:#e2504a;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei","Heiti TC",system-ui,sans-serif;
+    font-size:14px;line-height:1.4;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+    touch-action:none;
+  }
+  #app{
+    height:100vh;height:100dvh;display:flex;flex-direction:column;
+    padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+  }
+
+  /* ---------- HUD ---------- */
+  #hud{display:flex;align-items:stretch;gap:6px;padding:6px 8px;background:var(--panel);border-bottom:1px solid var(--line)}
+  #hud h1{margin:0;font-size:15px;font-weight:800;letter-spacing:.02em;align-self:center;color:var(--brain);white-space:nowrap}
+  .stats{display:flex;flex:1;gap:4px;justify-content:flex-end}
+  .stat{background:var(--panel2);border-radius:6px;padding:2px 8px;min-width:58px;text-align:center}
+  .stat small{display:block;font-size:10px;color:var(--dim)}
+  .stat b{font-size:15px;font-variant-numeric:tabular-nums}
+  #sHp.low b{color:var(--danger)}
+
+  /* ---------- 地圖 ---------- */
+  #stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:4px;position:relative}
+  #cv{display:block;border:1px solid var(--line);border-radius:4px;touch-action:none;cursor:crosshair}
+
+  /* ---------- Log ---------- */
+  #side{background:var(--panel);border-top:1px solid var(--line)}
+  #side h2{display:none;margin:0;padding:10px 12px 6px;font-size:13px;color:var(--dim);font-weight:600}
+  #log{height:3.1em;overflow-y:auto;padding:3px 10px;font-size:12px;touch-action:pan-y;overscroll-behavior:contain}
+  #log div{padding:1px 0;color:var(--dim)}
+  #log div:first-child{color:var(--ink)}
+  #log .bad{color:#f08a80}
+  #log .mem{color:var(--brain)}
+  #log .good{color:#8fd9a8}
+
+  /* ---------- 控制列 ---------- */
+  #controls{background:var(--panel);padding:6px 8px 8px;border-top:1px solid var(--line)}
+  .row{display:flex;gap:6px}
+  .row + .row{margin-top:6px}
+  button{
+    font:inherit;color:var(--ink);background:var(--panel2);border:2px solid transparent;border-radius:10px;
+    min-height:48px;padding:4px 6px;cursor:pointer;touch-action:manipulation;
+  }
+  button:focus-visible{outline:2px solid var(--brain);outline-offset:2px}
+  button:disabled{opacity:.4;cursor:default}
+  .tool{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:12px;min-width:0}
+  .tool i{width:16px;height:16px;display:block;margin-bottom:2px}
+  .tool small{color:var(--dim);font-size:11px}
+  .tool.on{border-color:var(--ink);background:#30374f}
+  .i-wall{background:var(--wall);border-radius:2px}
+  .i-turret{background:var(--turret);border-radius:50%}
+  .i-trap{background:var(--trap);border-radius:2px;outline:1px dashed #d8a877;outline-offset:-4px}
+  .i-bait{background:var(--bait);border-radius:50%}
+  .i-remove{position:relative}
+  .i-remove::before,.i-remove::after{content:"";position:absolute;left:7px;top:-1px;width:3px;height:18px;background:var(--danger);border-radius:2px;transform:rotate(45deg)}
+  .i-remove::after{transform:rotate(-45deg)}
+  #btnStart{flex:2;background:var(--go);color:#1b1208;font-weight:800;font-size:15px}
+  #btnSpeed,#btnHeat,#btnReset{flex:1;font-size:13px}
+  #btnSpeed.fast{border-color:var(--bait);color:var(--bait)}
+  #btnHeat.on{border-color:var(--brain);color:var(--brain)}
+  #btnReset.arm{background:var(--danger);color:#fff}
+
+  /* ---------- 報告／結算 Modal ---------- */
+  #modal{position:fixed;inset:0;background:rgba(10,12,20,.78);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+  #modal.show{display:flex}
+  #card{background:var(--panel);border:1px solid var(--line);border-top:4px solid var(--brain);border-radius:12px;max-width:440px;width:100%;max-height:86vh;display:flex;flex-direction:column}
+  #card.win{border-top-color:var(--core)} #card.lose{border-top-color:var(--danger)}
+  #mTitle{margin:0;padding:14px 16px 4px;font-size:18px}
+  #mSub{padding:0 16px 8px;color:var(--dim);font-size:13px}
+  #mBody{margin:0;padding:0 16px 8px 34px;overflow-y:auto;touch-action:pan-y;font-size:14px}
+  #mBody li{margin:6px 0}
+  #mBody li.mem::marker{color:var(--brain)}
+  #mBody li.next{color:var(--bait)}
+  #mBtn{margin:8px 16px 16px;background:var(--go);color:#1b1208;font-weight:800}
+
+  /* ---------- 桌面版：地圖在左，Log 在右 ---------- */
+  @media (min-width:900px) and (min-aspect-ratio:11/10){
+    #app{display:grid;grid-template-columns:1fr 300px;grid-template-rows:auto 1fr auto;
+         grid-template-areas:"hud hud" "stage side" "controls side"}
+    #hud{grid-area:hud;padding:8px 14px} #hud h1{font-size:20px}
+    .stat{min-width:84px;padding:4px 10px} .stat b{font-size:18px} .stat small{font-size:11px}
+    #stage{grid-area:stage;padding:10px}
+    #side{grid-area:side;border-top:0;border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+    #side h2{display:block}
+    #log{flex:1;height:auto;font-size:13px;padding:0 12px 12px}
+    #log div{padding:3px 0;border-bottom:1px solid #262c40}
+    #controls{grid-area:controls;padding:8px 14px 12px}
+    #controls{display:flex;gap:10px} .row{flex:3} .row + .row{margin-top:0;flex:2}
+    .tool{flex-direction:row;gap:6px;font-size:13px} .tool i{margin:0}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <h1>Brain Shift</h1>
+    <div class="stats">
+      <div class="stat"><small>波次</small><b id="vWave">0/8</b></div>
+      <div class="stat"><small>資金</small><b id="vMoney">$120</b></div>
+      <div class="stat" id="sHp"><small>核心</small><b id="vHp">100</b></div>
+      <div class="stat"><small>殭屍</small><b id="vLeft">0</b></div>
+    </div>
+  </header>
+
+  <main id="stage"><canvas id="cv"></canvas></main>
+
+  <aside id="side">
+    <h2>事件紀錄</h2>
+    <div id="log"></div>
+  </aside>
+
+  <footer id="controls">
+    <div class="row" id="tools">
+      <button class="tool on" data-tool="wall"><i class="i-wall"></i>牆<small>$10</small></button>
+      <button class="tool" data-tool="turret"><i class="i-turret"></i>機槍塔<small>$30</small></button>
+      <button class="tool" data-tool="trap"><i class="i-trap"></i>陷阱<small>$15</small></button>
+      <button class="tool" data-tool="bait"><i class="i-bait"></i>誘餌<small>$12</small></button>
+      <button class="tool" data-tool="remove"><i class="i-remove"></i>拆除<small>回收</small></button>
+    </div>
+    <div class="row">
+      <button id="btnStart">開始第 1 波</button>
+      <button id="btnSpeed">速度 1x</button>
+      <button id="btnHeat">記憶熱圖</button>
+      <button id="btnReset">重置</button>
+    </div>
+  </footer>
+</div>
+
+<div id="modal"><div id="card">
+  <h2 id="mTitle"></h2>
+  <div id="mSub"></div>
+  <ul id="mBody"></ul>
+  <button id="mBtn"></button>
+</div></div>
+
+<script>
+'use strict';
+/* =====================================================================
+ * Brain Shift — Game Jam 原型
+ * 模組一覽（對應未來 Unity 類別）：
+ *   CONFIG      所有可調數值            → ScriptableObject
+ *   Grid        格子地圖與建築          → GridManager
+ *   Memory      殭屍族群記憶（學習核心）→ HordeMemory
+ *   Path        A* 與成本函式           → Pathfinder
+ *   Zombies     殭屍個體行為            → ZombieAgent
+ *   Game        波次、經濟、勝負、報告  → GameManager / WaveManager
+ *   Renderer    Canvas 2D 繪製          → 由 Unity 場景/Tilemap 取代
+ *   UI / Input  DOM 介面與觸控          → UGUI / UI Toolkit
+ * 遊戲邏輯（Grid/Memory/Path/Zombies/Game）完全不碰 DOM，可獨立移植。
+ * ===================================================================== */
+
+/* ============================== CONFIG ============================== */
+const CONFIG = {
+  COLS: 20, ROWS: 12,
+  CORE: { x: 19, y: 6 },
+  CORE_HP: 100,
+  START_MONEY: 160,
+  MAX_WAVE: 8,
+  REPATH_INTERVAL: 1.2,          // 殭屍重新尋路的間隔（秒）
+
+  WAVE: {
+    baseCount: 9, perWave: 3,    // 第 1 波 9 隻，之後每波 +3
+    hpScale: 0.09, dmgScale: 0.05,
+    spawnInterval: 0.8, spawnIntervalStep: 0.05, spawnIntervalMin: 0.4,
+    baseIncome: 35, incomePerWave: 5, killReward: 3,
+    scoutChance: 0.22,
+    breakerBase: 0.08, breakerPerWave: 0.025, breakerThreatBonus: 0.22, breakerMax: 0.5,
+  },
+
+  BUILD: {
+    wall:   { name: '牆',     cost: 10, refund: 5,  hp: 60, blocks: true },
+    turret: { name: '機槍塔', cost: 30, refund: 15, hp: 120, blocks: true, range: 2.6, cooldown: 0.45, damage: 10 },
+    trap:   { name: '陷阱',   cost: 15, refund: 7,  damage: 3, slowFactor: 0.5, slowTime: 2.0 },
+    bait:   { name: '誘餌',   cost: 12, refund: 6,  uses: 6, stall: 1.6, fieldRadius: 3, lureRadius: 4 },
+  },
+
+  /* 每種殭屍的「個性」＝ A* 成本權重不同 */
+  ZOMBIE: {
+    normal:  { name: '普通殭屍', color: '#e2504a', radius: 0.27, hp: 40,  speed: 1.5,  coreDmg: 6,  wallDps: 8,
+               dangerWeight: 0.6,  unknownPenalty: 0.35, baitAttraction: 0.5, breachBonus: 0.2,  trapPenalty: 1.5,
+               wallCost: 40, noise: 0.5, baitChance: 0.45 },
+    scout:   { name: '偵察殭屍', color: '#f0c94a', radius: 0.21, hp: 22,  speed: 2.6,  coreDmg: 4,  wallDps: 4,
+               dangerWeight: 0.2,  unknownPenalty: -0.15, baitAttraction: 0.8, breachBonus: 0.25, trapPenalty: 0.5,
+               wallCost: 60, noise: 0.9, baitChance: 0.75 },
+    breaker: { name: '拆牆殭屍', color: '#a868e0', radius: 0.35, hp: 100, speed: 0.95, coreDmg: 12, wallDps: 24,
+               dangerWeight: 0.4,  unknownPenalty: 0.3,  baitAttraction: 0.25, breachBonus: 0.25, trapPenalty: 1.0,
+               wallCost: 9,  noise: 0.3, baitChance: 0.2 },
+  },
+
+  MEMORY: {
+    deathDanger: 1.0, deathNeighbor: 0.4,   // 死亡熱圖增量
+    dangerDecay: 0.85, dangerMax: 10,       // 每波衰減，避免殭屍變得完美
+    breachWall: 1.5, breachCore: 0.5, breachDecay: 0.9, breachCap: 3,
+    trapDecay: 0.7,
+    threatDecay: 0.6, threatThreshold: 380, // 機槍塔威脅門檻
+  },
+  MIN_STEP_COST: 0.15,
+};
+
+const C = CONFIG.COLS, R = CONFIG.ROWS, N = C * R;
+const idx = (x, y) => y * C + x;
+const ix = i => i % C, iy = i => (i / C) | 0;
+const CORE_I = idx(CONFIG.CORE.x, CONFIG.CORE.y);
+const DIRS = [[1, 0], [0, 1], [0, -1], [-1, 0]];
+
+/* ============================== Grid ============================== */
+const Grid = {
+  cells: new Array(N).fill(null),     // null 或 {type, hp, uses, cd}
+  baitField: new Float32Array(N),     // 誘餌吸引力場（給 A* 用）
+
+  reset() { this.cells.fill(null); this.refresh(); },
+  blocks(i) { const c = this.cells[i]; return !!c && !!CONFIG.BUILD[c.type].blocks; },
+
+  place(i, type) {
+    const d = CONFIG.BUILD[type];
+    this.cells[i] = { type, hp: d.hp || 0, uses: d.uses || 0, cd: 0 };
+    this.refresh();
+  },
+  remove(i) { this.cells[i] = null; this.refresh(); },
+
+  /** 建築變動後重算誘餌吸引力場 */
+  refresh() {
+    this.baitField.fill(0);
+    const rad = CONFIG.BUILD.bait.fieldRadius;
+    for (let i = 0; i < N; i++) {
+      const c = this.cells[i];
+      if (!c || c.type !== 'bait') continue;
+      const bx = ix(i), by = iy(i);
+      for (let y = Math.max(0, by - rad); y <= Math.min(R - 1, by + rad); y++)
+        for (let x = Math.max(0, bx - rad); x <= Math.min(C - 1, bx + rad); x++) {
+          const d = Math.abs(x - bx) + Math.abs(y - by);
+          if (d <= rad) this.baitField[idx(x, y)] += 1 - d / (rad + 1);
+        }
+    }
+  },
+  repairAll() {
+    for (const c of this.cells) if (c && CONFIG.BUILD[c.type].hp) c.hp = CONFIG.BUILD[c.type].hp;
+  },
+};
+
+/* ============================== Memory（族群記憶） ==============================
+ * 所有殭屍共享。波次中的事件先寫入 pending，波次結束時 commit()，
+ * 所以「這一波的死亡」只會影響「下一波」的路徑。
+ * ============================================================================= */
+const Memory = {
+  danger: new Float32Array(N),  breach: new Float32Array(N),
+  trap: new Float32Array(N),    known: new Uint8Array(N),
+  pDanger: new Float32Array(N), pBreach: new Float32Array(N),
+  pTrap: new Uint8Array(N),     pKnown: new Uint8Array(N),
+  threat: 0,                    // 機槍塔威脅值（跨波累積並衰減）
+
+  reset() {
+    for (const k of ['danger', 'breach', 'trap', 'known', 'pDanger', 'pBreach', 'pTrap', 'pKnown']) this[k].fill(0);
+    this.threat = 0;
+  },
+  recordDeath(i) {
+    const M = CONFIG.MEMORY, x = ix(i), y = iy(i);
+    this.pDanger[i] += M.deathDanger;
+    for (const [dx, dy] of DIRS) {
+      const nx = x + dx, ny = y + dy;
+      if (nx >= 0 && ny >= 0 && nx < C && ny < R) this.pDanger[idx(nx, ny)] += M.deathNeighbor;
+    }
+  },
+  recordBreach(i, amount) { this.pBreach[i] += amount; },
+  recordTrap(i) { this.pTrap[i] = 1; },
+  recordVisit(i) { this.pKnown[i] = 1; },
+
+  /** 波次結束：把本波經驗併入長期記憶（含衰減） */
+  commit(turretDamage) {
+    const M = CONFIG.MEMORY;
+    for (let i = 0; i < N; i++) {
+      this.danger[i] = Math.min(M.dangerMax, this.danger[i] * M.dangerDecay + this.pDanger[i]);
+      this.breach[i] = Math.min(M.breachCap * 2, this.breach[i] * M.breachDecay + this.pBreach[i]);
+      if (this.breach[i] < 0.15) this.breach[i] = 0;
+      this.trap[i] = Math.max(this.trap[i] * M.trapDecay, this.pTrap[i]);
+      if (this.trap[i] < 0.1) this.trap[i] = 0;
+      if (this.pKnown[i]) this.known[i] = 1;
+    }
+    this.pDanger.fill(0); this.pBreach.fill(0); this.pTrap.fill(0); this.pKnown.fill(0);
+    this.threat = this.threat * M.threatDecay + turretDamage;
+  },
+  threatHigh() { return this.threat >= CONFIG.MEMORY.threatThreshold; },
+};
+
+/* ============================== Path（A*） ============================== */
+const Path = {
+  g: new Float32Array(N), came: new Int16Array(N), state: new Uint8Array(N),
+
+  /** 每隻殭屍固定的雜訊：讓牠們「判斷有誤差」、不會全走同一條線 */
+  noise(i, seed) {
+    let h = Math.imul(i + 1, 374761393) + Math.imul(seed, 668265263);
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  },
+
+  /** 進入格子 i 的成本：
+   *  cost = base + danger*dangerWeight + unknownPenalty - baitAttraction - breachBonus + trapPenalty (+牆的破壞成本) */
+  cost(i, z) {
+    const t = z.def, M = CONFIG.MEMORY;
+    let c = 1;
+    c += Memory.danger[i] * t.dangerWeight * z.dangerSense;
+    if (!Memory.known[i]) c += t.unknownPenalty;
+    c -= Grid.baitField[i] * t.baitAttraction;
+    c -= Math.min(Memory.breach[i], M.breachCap) * t.breachBonus;
+    c += Memory.trap[i] * t.trapPenalty;
+    c += this.noise(i, z.seed) * t.noise;
+    if (c < CONFIG.MIN_STEP_COST) c = CONFIG.MIN_STEP_COST;
+    // 牆/塔視為「很貴但可通過」：路徑若穿過牆，代表殭屍決定拆牆。
+    // 這同時保證玩家把路封死時仍一定有路徑，不會卡住。
+    const cell = Grid.cells[i];
+    if (cell && CONFIG.BUILD[cell.type].blocks) c += t.wallCost * (cell.type === 'turret' ? 1.5 : 1);
+    return c;
+  },
+
+  /** 回傳從 start（不含）到 goal 的格子索引陣列 */
+  find(start, goal, z) {
+    const g = this.g, came = this.came, st = this.state, minC = CONFIG.MIN_STEP_COST;
+    g.fill(Infinity); came.fill(-1); st.fill(0);
+    const gx = ix(goal), gy = iy(goal);
+    const open = [start]; g[start] = 0; st[start] = 1;
+    while (open.length) {
+      let bi = 0, bf = Infinity;
+      for (let k = 0; k < open.length; k++) {
+        const n = open[k];
+        const f = g[n] + (Math.abs(ix(n) - gx) + Math.abs(iy(n) - gy)) * minC;
+        if (f < bf) { bf = f; bi = k; }
+      }
+      const cur = open[bi]; open[bi] = open[open.length - 1]; open.pop();
+      if (cur === goal) break;
+      st[cur] = 2;
+      const cx = ix(cur), cy = iy(cur);
+      for (const [dx, dy] of DIRS) {
+        const nx = cx + dx, ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= C || ny >= R) continue;
+        const ni = idx(nx, ny);
+        if (st[ni] === 2) continue;
+        const ng = g[cur] + this.cost(ni, z);
+        if (ng < g[ni]) { g[ni] = ng; came[ni] = cur; if (st[ni] !== 1) { st[ni] = 1; open.push(ni); } }
+      }
+    }
+    const out = [];
+    let n = goal;
+    while (n !== start && n >= 0) { out.push(n); n = came[n]; }
+    out.reverse();
+    return out;
+  },
+};
+
+/* ============================== Zombies ============================== */
+const Zombies = {
+  list: [], nextId: 1,
+
+  spawn(type, row, wave) {
+    const def = CONFIG.ZOMBIE[type], W = CONFIG.WAVE;
+    const hp = Math.round(def.hp * (1 + W.hpScale * (wave - 1)));
+    const z = {
+      id: this.nextId++, type, def,
+      x: -0.8, y: row,                 // 連續座標（格子單位）
+      cell: idx(0, row),               // 最後抵達/正要抵達的格子
+      path: [idx(0, row)], pi: 0,
+      hp, maxHp: hp,
+      coreDmg: Math.round(def.coreDmg * (1 + W.dmgScale * (wave - 1))),
+      repath: 0, slow: 0, stun: 0, attacking: false,
+      target: -1,                      // 暫時目標（誘餌格），-1 表示核心
+      baitSeen: {},                    // 已判定過的誘餌，避免重複被騙
+      seed: (Math.random() * 1e9) | 0,
+      dangerSense: 0.6 + Math.random() * 0.8, // 個體對危險的敏感度（錯誤判斷來源）
+      hist: [], trail: [], trailT: 0,
+    };
+    this.list.push(z);
+    return z;
+  },
+
+  update(z, dt) {
+    if (z.slow > 0) z.slow -= dt;
+    z.repath -= dt;
+    z.trailT -= dt;
+    if (z.trailT <= 0) { z.trailT = 0.07; z.trail.push(z.x, z.y); if (z.trail.length > 16) z.trail.splice(0, 2); }
+    if (z.stun > 0) { z.stun -= dt; return; }
+
+    if (z.pi >= z.path.length) this.plan(z);
+    const next = z.path[z.pi];
+    if (next === undefined) return;
+
+    // 下一格是牆/塔 → 攻擊它
+    if (Grid.blocks(next)) {
+      z.attacking = true;
+      const cell = Grid.cells[next];
+      cell.hp -= z.def.wallDps * dt;
+      if (cell.hp <= 0) Game.onStructureDestroyed(next, cell);
+      else if (z.repath <= 0) this.plan(z);   // 定期重新評估是否改繞路
+      return;
+    }
+    z.attacking = false;
+
+    // 朝下一格中心移動
+    const tx = ix(next), ty = iy(next);
+    const dx = tx - z.x, dy = ty - z.y, dist = Math.hypot(dx, dy);
+    const step = z.def.speed * (z.slow > 0 ? CONFIG.BUILD.trap.slowFactor : 1) * dt;
+    if (step >= dist) {
+      z.x = tx; z.y = ty; z.cell = next; z.pi++;
+      this.onEnter(z, next);
+      // 只在「站在格子中心」時重新尋路，避免斜切穿牆
+      if (!z.dead && (z.repath <= 0 || z.pi >= z.path.length)) this.plan(z);
+    } else { z.x += dx / dist * step; z.y += dy / dist * step; }
+  },
+
+  /** 決定目標並計算路徑 */
+  plan(z) {
+    z.repath = CONFIG.REPATH_INTERVAL * (0.8 + Math.random() * 0.4);
+    const B = CONFIG.BUILD.bait;
+    // 暫時目標失效（誘餌被吃光或拆除）
+    if (z.target >= 0 && !(Grid.cells[z.target] && Grid.cells[z.target].type === 'bait')) z.target = -1;
+    // 看見誘餌 → 擲骰決定是否上鉤（每個誘餌每隻殭屍只判定一次）
+    if (z.target < 0) {
+      const cx = ix(z.cell), cy = iy(z.cell);
+      for (let i = 0; i < N; i++) {
+        const c = Grid.cells[i];
+        if (!c || c.type !== 'bait' || z.baitSeen[i]) continue;
+        if (Math.abs(ix(i) - cx) + Math.abs(iy(i) - cy) > B.lureRadius) continue;
+        z.baitSeen[i] = 1;
+        if (Math.random() < z.def.baitChance) { z.target = i; break; }
+      }
+    }
+    z.path = Path.find(z.cell, z.target >= 0 ? z.target : CORE_I, z);
+    z.pi = 0;
+  },
+
+  onEnter(z, i) {
+    Memory.recordVisit(i);
+    if (z.hist.length < 120) z.hist.push(i);
+    if (i === CORE_I) { Game.onCoreReached(z); return; }
+    const c = Grid.cells[i];
+    if (!c) return;
+    if (c.type === 'trap') {
+      const T = CONFIG.BUILD.trap;
+      z.slow = T.slowTime;
+      Memory.recordTrap(i);
+      Game.stats.trapHits++;
+      Game.damage(z, T.damage, false);
+    } else if (c.type === 'bait' && z.baitSeen[i] !== 2) {
+      z.baitSeen[i] = 2; z.stun = CONFIG.BUILD.bait.stall;
+      if (z.target === i) z.target = -1;
+      Game.onBaitUsed(i, c);
+    }
+  },
+};
+
+/* ============================== Game ============================== */
+const Game = {
+  phase: 'build',   // 'build' | 'wave' | 'over'
+  wave: 0, money: 0, coreHp: 0,
+  queue: [], spawnT: 0, spawnWeights: null,
+  stats: null, fx: [], lastBaitLog: 0, time: 0,
+  portrait: false,  // 由 Renderer 設定，只影響報告中的方位用語
+
+  reset() {
+    Grid.reset(); Memory.reset();
+    Zombies.list.length = 0;
+    this.phase = 'build'; this.wave = 0; this.money = CONFIG.START_MONEY; this.coreHp = CONFIG.CORE_HP;
+    this.queue = []; this.fx = []; this.time = 0;
+    this.spawnWeights = new Array(R).fill(1);
+    this.newStats();
+    UI.clearLog();
+    UI.log('建造階段：點格子放置設施，準備好就開始第 1 波。');
+    UI.log('殭屍從' + (this.portrait ? '上方' : '左側') + '進場，目標是綠色核心。');
+    UI.sync();
+  },
+  newStats() {
+    this.stats = { kills: 0, leaks: 0, leakDmg: 0, turretDmg: 0, trapHits: 0, baited: 0, wallsBroken: [], deaths: [] };
+  },
+  left() { return this.queue.length + Zombies.list.length; },
+
+  /* ---------- 建造 ---------- */
+  applyTool(tool, x, y, silent) {
+    const say = (m, cls) => { if (!silent) UI.log(m, cls); };
+    if (this.phase === 'over') return false;
+    if (this.phase !== 'build') { say('波次進行中，等這一波結束才能改建。'); return false; }
+    if (x < 0 || y < 0 || x >= C || y >= R) return false;
+    const i = idx(x, y), c = Grid.cells[i];
+    if (tool === 'remove') {
+      if (!c) return false;
+      const d = CONFIG.BUILD[c.type];
+      this.money += d.refund; Grid.remove(i);
+      say(`拆除 (${x}, ${y}) 的${d.name}，回收 $${d.refund}。`);
+      UI.sync(); return true;
+    }
+    const d = CONFIG.BUILD[tool];
+    if (i === CORE_I) { say('不能蓋在核心上。'); return false; }
+    if (x === 0) { say('殭屍入口那一排不能建造。'); return false; }
+    if (c) { say('這格已經有設施，先拆除再蓋。'); return false; }
+    if (this.money < d.cost) { say(`資金不足：${d.name}需要 $${d.cost}。`, 'bad'); return false; }
+    this.money -= d.cost; Grid.place(i, tool);
+    UI.sync(); return true;
+  },
+
+  /* ---------- 波次 ---------- */
+  startWave() {
+    if (this.phase !== 'build') return;
+    this.wave++;
+    this.phase = 'wave';
+    this.newStats();
+    const W = CONFIG.WAVE, count = W.baseCount + W.perWave * (this.wave - 1);
+    const bp = this.breakerChance(this.wave);
+    this.queue = [];
+    for (let k = 0; k < count; k++) {
+      let t = 'normal';
+      if (k < 2) t = 'scout';                                // 每波先派偵察兵試探
+      else if (this.wave >= 2 && Math.random() < bp) t = 'breaker';
+      else if (Math.random() < W.scoutChance) t = 'scout';
+      this.queue.push(t);
+    }
+    this.spawnWeights = this.computeSpawnWeights();
+    this.spawnT = 0.5;
+    UI.log(`第 ${this.wave} 波開始：${count} 隻殭屍正在接近。`);
+    if (Memory.threatHigh()) UI.log('屍群記得機槍塔的火力，這一波拆牆殭屍變多了。', 'mem');
+    UI.sync();
+  },
+  breakerChance(wave) {
+    const W = CONFIG.WAVE;
+    if (wave < 2) return 0;
+    return Math.min(W.breakerMax, W.breakerBase + W.breakerPerWave * (wave - 1) + (Memory.threatHigh() ? W.breakerThreatBonus : 0));
+  },
+  /** 進場列的權重：偏好曾突破的路線、避開死亡率高的路線（保留隨機） */
+  computeSpawnWeights() {
+    const w = new Array(R);
+    for (let r = 0; r < R; r++) {
+      let d = 0, b = 0;
+      for (let x = 0; x < 8; x++) d += Memory.danger[idx(x, r)];
+      for (let x = 0; x < C; x++)
+        for (let rr = Math.max(0, r - 1); rr <= Math.min(R - 1, r + 1); rr++) b += Memory.breach[idx(x, rr)];
+      w[r] = (1 + 0.5 * b) / (1 + 0.12 * d) + 0.25;
+    }
+    return w;
+  },
+  pickRow() {
+    const w = this.spawnWeights; let sum = 0;
+    for (const v of w) sum += v;
+    let r = Math.random() * sum;
+    for (let i = 0; i < R; i++) { r -= w[i]; if (r <= 0) return i; }
+    return R - 1;
+  },
+
+  update(dt) {
+    this.time += dt;
+    for (let k = this.fx.length - 1; k >= 0; k--) { this.fx[k].t -= dt; if (this.fx[k].t <= 0) this.fx.splice(k, 1); }
+    if (this.phase !== 'wave') return;
+    const W = CONFIG.WAVE;
+
+    // 生成
+    if (this.queue.length) {
+      this.spawnT -= dt;
+      if (this.spawnT <= 0) {
+        Zombies.spawn(this.queue.shift(), this.pickRow(), this.wave);
+        this.spawnT = Math.max(W.spawnIntervalMin, W.spawnInterval - W.spawnIntervalStep * (this.wave - 1));
+        UI.sync();
+      }
+    }
+    // 殭屍
+    const L = Zombies.list;
+    for (let k = 0; k < L.length; k++) if (!L[k].dead) Zombies.update(L[k], dt);
+    // 機槍塔
+    const T = CONFIG.BUILD.turret, r2 = T.range * T.range;
+    for (let i = 0; i < N; i++) {
+      const c = Grid.cells[i];
+      if (!c || c.type !== 'turret') continue;
+      c.cd -= dt;
+      if (c.cd > 0) continue;
+      const tx = ix(i), ty = iy(i);
+      let best = null, bd = r2;
+      for (const z of L) {
+        if (z.dead) continue;
+        const d = (z.x - tx) * (z.x - tx) + (z.y - ty) * (z.y - ty);
+        if (d <= bd) { bd = d; best = z; }
+      }
+      if (best) {
+        c.cd = T.cooldown;
+        this.fx.push({ kind: 'shot', x1: tx, y1: ty, x2: best.x, y2: best.y, t: 0.08, d: 0.08 });
+        this.damage(best, T.damage, true);
+      } else c.cd = 0;
+    }
+    // 清除死亡個體
+    for (let k = L.length - 1; k >= 0; k--) if (L[k].dead) L.splice(k, 1);
+
+    if (this.coreHp <= 0) { this.gameOver(false); return; }
+    if (!this.queue.length && !L.length) this.endWave();
+  },
+
+  damage(z, amount, fromTurret) {
+    if (z.dead) return;
+    if (fromTurret) this.stats.turretDmg += Math.min(amount, z.hp);
+    z.hp -= amount;
+    if (z.hp > 0) return;
+    z.dead = true;
+    const cx = Math.max(0, Math.min(C - 1, Math.round(z.x))), cy = Math.max(0, Math.min(R - 1, Math.round(z.y)));
+    const i = idx(cx, cy);
+    Memory.recordDeath(i);
+    this.stats.kills++; this.stats.deaths.push(i);
+    this.fx.push({ kind: 'pop', x1: z.x, y1: z.y, t: 0.35, d: 0.35, color: z.def.color });
+    UI.sync();
+  },
+
+  onStructureDestroyed(i, cell) {
+    const name = CONFIG.BUILD[cell.type].name;
+    Grid.remove(i);
+    Memory.recordBreach(i, CONFIG.MEMORY.breachWall);     // 破牆處 = 突破點
+    this.stats.wallsBroken.push(i);
+    UI.log(`殭屍破壞了 (${ix(i)}, ${iy(i)}) 的${name}。`, 'bad');
+    for (const z of Zombies.list) z.repath = 0;           // 地形改變，全體重新尋路
+  },
+
+  onCoreReached(z) {
+    z.dead = true;
+    this.coreHp = Math.max(0, this.coreHp - z.coreDmg);
+    this.stats.leaks++; this.stats.leakDmg += z.coreDmg;
+    // 記錄突破路線：最後一步 + 路上緊貼防禦設施的缺口
+    const h = z.hist, B = CONFIG.MEMORY.breachCore;
+    if (h.length >= 2) Memory.recordBreach(h[h.length - 2], B);
+    let found = 0;
+    for (let k = h.length - 3; k >= 0 && found < 2; k--) {
+      const x = ix(h[k]), y = iy(h[k]);
+      for (const [dx, dy] of DIRS) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < C && ny < R && Grid.blocks(idx(nx, ny))) { Memory.recordBreach(h[k], B); found++; break; }
+      }
+    }
+    this.fx.push({ kind: 'hit', x1: CONFIG.CORE.x, y1: CONFIG.CORE.y, t: 0.4, d: 0.4 });
+    UI.log(`殭屍突破防線，核心受到 ${z.coreDmg} 點傷害！`, 'bad');
+    UI.sync();
+  },
+
+  onBaitUsed(i, cell) {
+    this.stats.baited++;
+    cell.uses--;
+    if (this.time - this.lastBaitLog > 1.5 || this.time < this.lastBaitLog) {
+      this.lastBaitLog = this.time; UI.log('殭屍被誘餌吸引，暫時停滯。');
+    }
+    if (cell.uses <= 0) { Grid.remove(i); UI.log(`(${ix(i)}, ${iy(i)}) 的誘餌被啃光了。`); }
+  },
+
+  endWave() {
+    const W = CONFIG.WAVE, s = this.stats;
+    const income = W.baseIncome + W.incomePerWave * this.wave + W.killReward * s.kills;
+    this.money += income;
+    const report = this.buildReport();          // 先用本波資料寫報告
+    Memory.commit(s.turretDmg);                 // 再併入族群記憶
+    report.push(...this.buildForecast());
+    Grid.repairAll();
+    UI.log(`第 ${this.wave} 波結束：擊殺 ${s.kills} 隻，獲得 $${income}。`, 'good');
+    const hot = this.hottestCell(Memory.danger);
+    if (hot >= 0) UI.log(`殭屍記住高死亡率區域：(${ix(hot)}, ${iy(hot)})，下一波將降低該區吸引力。`, 'mem');
+
+    if (this.wave >= CONFIG.MAX_WAVE) { this.gameOver(true); return; }
+    this.phase = 'build';
+    this.spawnWeights = this.computeSpawnWeights();
+    UI.sync();
+    UI.showModal('report', `第 ${this.wave} 波屍腦報告`,
+      `擊殺 ${s.kills} 隻，漏掉 ${s.leaks} 隻，收入 $${income}`, report, '回到建造階段');
+  },
+
+  gameOver(win) {
+    this.phase = 'over';
+    UI.sync();
+    if (win) {
+      UI.log('你撐過了第 8 波，堡壘守住了。', 'good');
+      UI.showModal('win', '堡壘守住了', `核心剩餘 ${this.coreHp} 點生命`,
+        [{ t: '屍群學了 8 波，還是沒能攻破你的防線。' }], '再玩一次', () => Game.reset());
+    } else {
+      UI.log('核心被摧毀。', 'bad');
+      UI.showModal('lose', '核心被攻破', `倒在第 ${this.wave} 波`,
+        [{ t: '屍群找到了你的弱點。打開記憶熱圖，看看牠們記住了什麼。', c: 'mem' }], '重新開始', () => Game.reset());
+    }
+  },
+
+  /* ---------- 屍腦報告 ---------- */
+  hottestCell(arr) {
+    let b = -1, bv = 1.2;
+    for (let i = 0; i < N; i++) if (arr[i] > bv) { bv = arr[i]; b = i; }
+    return b;
+  },
+  laneName(y) {
+    const k = y < 4 ? 0 : y < 8 ? 1 : 2;
+    return (this.portrait ? ['左路', '中路', '右路'] : ['上路', '中路', '下路'])[k];
+  },
+  zoneName(i) {
+    const x = ix(i), depth = x < 7 ? '外圍' : x < 13 ? '中段' : '核心前';
+    const lane = this.laneName(iy(i));
+    return lane === '中路' && depth === '中段' ? '中央區' : lane + depth;
+  },
+  buildReport() {
+    const s = this.stats, out = [];
+    // 1. 死亡熱點
+    const zones = {};
+    for (const i of s.deaths) { const n = this.zoneName(i); zones[n] = (zones[n] || 0) + 1; }
+    const sorted = Object.entries(zones).sort((a, b) => b[1] - a[1]);
+    if (sorted.length) {
+      out.push({ t: `${sorted[0][0]}死亡 ${sorted[0][1]} 隻：危險認知上升`, c: 'mem' });
+      if (sorted[0][1] >= 5) out.push({ t: `族群開始避開${sorted[0][0]}，會試著從旁邊繞`, c: 'mem' });
+    } else out.push({ t: '這一波沒有殭屍死亡：族群認為這條路很安全' });
+    // 2. 突破
+    if (s.wallsBroken.length) {
+      const z = this.zoneName(s.wallsBroken[s.wallsBroken.length - 1]);
+      out.push({ t: `${z}的防線被拆開 ${s.wallsBroken.length} 處：下一波會優先從缺口進攻`, c: 'mem' });
+    }
+    if (s.leaks) out.push({ t: `${s.leaks} 隻抵達核心（共 ${s.leakDmg} 傷害）：這條路線被記住了`, c: 'mem' });
+    // 3. 陷阱與誘餌
+    if (s.trapHits) out.push({ t: `踩中陷阱 ${s.trapHits} 次：位置已記下，之後會盡量繞開`, c: 'mem' });
+    if (s.baited) out.push({ t: `${s.baited} 隻被誘餌拖住：偵察殭屍最容易上當` });
+    return out;
+  },
+  buildForecast() {
+    const out = [], next = this.wave + 1;
+    if (next > CONFIG.MAX_WAVE) return out;
+    // 機槍塔威脅（commit 之後才準）
+    const p = Math.round(this.breakerChance(next) * 100);
+    if (Memory.threatHigh()) out.push({ t: `機槍塔威脅上升：下一波拆牆殭屍機率提高到 ${p}%`, c: 'mem' });
+    else if (this.stats.turretDmg > 0) out.push({ t: `機槍塔威脅尚低：拆牆殭屍機率 ${p}%` });
+    // 進場偏好
+    const w = this.computeSpawnWeights(), lanes = [0, 0, 0];
+    for (let r = 0; r < R; r++) lanes[r < 4 ? 0 : r < 8 ? 1 : 2] += w[r];
+    const total = lanes[0] + lanes[1] + lanes[2];
+    let bi = 0; for (let k = 1; k < 3; k++) if (lanes[k] > lanes[bi]) bi = k;
+    if (lanes[bi] / total > 0.4) out.push({ t: `下一波偏好從${this.laneName(bi * 4)}進場（約 ${Math.round(lanes[bi] / total * 100)}%）`, c: 'next' });
+    const W = CONFIG.WAVE;
+    out.push({ t: `下一波：${W.baseCount + W.perWave * (next - 1)} 隻`, c: 'next' });
+    return out;
+  },
+};
+
+/* ============================== UI（DOM） ============================== */
+const UI = {
+  speed: 1, ready: false, tool: 'wall', heat: false, hover: -1, el: {}, resetArm: 0, modalCb: null,
+
+  init() {
+    const $ = id => document.getElementById(id);
+    for (const id of ['vWave', 'vMoney', 'vHp', 'vLeft', 'sHp', 'log', 'btnStart', 'btnSpeed', 'btnHeat', 'btnReset', 'modal', 'card', 'mTitle', 'mSub', 'mBody', 'mBtn', 'tools']) this.el[id] = $(id);
+    this.ready = true;
+    const e = this.el;
+    e.tools.addEventListener('click', ev => {
+      const b = ev.target.closest('.tool'); if (b) this.setTool(b.dataset.tool);
+    });
+    e.btnStart.addEventListener('click', () => Game.startWave());
+    e.btnHeat.addEventListener('click', () => this.toggleHeat());
+    e.btnSpeed.addEventListener('click', () => this.cycleSpeed());
+    e.btnReset.addEventListener('click', () => {           // 連按兩次才重置，避免誤觸
+      if (Date.now() - this.resetArm < 2500) { this.resetArm = 0; e.btnReset.classList.remove('arm'); e.btnReset.textContent = '重置'; Game.reset(); }
+      else { this.resetArm = Date.now(); e.btnReset.classList.add('arm'); e.btnReset.textContent = '再按一次';
+        setTimeout(() => { if (this.resetArm && Date.now() - this.resetArm >= 2400) { this.resetArm = 0; e.btnReset.classList.remove('arm'); e.btnReset.textContent = '重置'; } }, 2500); }
+    });
+    e.mBtn.addEventListener('click', () => { e.modal.classList.remove('show'); const cb = this.modalCb; this.modalCb = null; if (cb) cb(); });
+    // 桌面快捷鍵：1-5 選工具、空白鍵開始、H 熱圖
+    window.addEventListener('keydown', ev => {
+      if (e.modal.classList.contains('show')) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); e.mBtn.click(); } return; }
+      const tools = ['wall', 'turret', 'trap', 'bait', 'remove'];
+      if (ev.key >= '1' && ev.key <= '5') this.setTool(tools[+ev.key - 1]);
+      else if (ev.key === ' ') { ev.preventDefault(); Game.startWave(); }
+      else if (ev.key === 'h' || ev.key === 'H') this.toggleHeat();
+      else if (ev.key === 'f' || ev.key === 'F') this.cycleSpeed();
+    });
+  },
+  setTool(t) {
+    this.tool = t;
+    for (const b of this.el.tools.children) b.classList.toggle('on', b.dataset.tool === t);
+  },
+  /** 遊戲速度 1x → 2x → 4x；只影響模擬步數，不改任何數值 */
+  cycleSpeed() {
+    this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 4 : 1;
+    this.el.btnSpeed.textContent = `速度 ${this.speed}x`;
+    this.el.btnSpeed.classList.toggle('fast', this.speed > 1);
+  },
+  toggleHeat() { this.heat = !this.heat; this.el.btnHeat.classList.toggle('on', this.heat); },
+
+  sync() {
+    if (!this.ready) return;
+    const e = this.el;
+    e.vWave.textContent = `${Game.wave}/${CONFIG.MAX_WAVE}`;
+    e.vMoney.textContent = '$' + Game.money;
+    e.vHp.textContent = Game.coreHp;
+    e.sHp.classList.toggle('low', Game.coreHp <= 30);
+    e.vLeft.textContent = Game.left();
+    e.btnStart.disabled = Game.phase !== 'build';
+    e.btnStart.textContent = Game.phase === 'wave' ? `第 ${Game.wave} 波進行中` :
+      Game.phase === 'over' ? '遊戲結束' : `開始第 ${Game.wave + 1} 波`;
+  },
+  log(msg, cls) {
+    if (!this.ready) return;
+    const d = document.createElement('div');
+    d.textContent = msg; if (cls) d.className = cls;
+    const L = this.el.log;
+    L.insertBefore(d, L.firstChild);
+    while (L.children.length > 40) L.removeChild(L.lastChild);   // 限制 DOM 數量
+    L.scrollTop = 0;
+  },
+  clearLog() { if (this.ready) this.el.log.textContent = ''; },
+  showModal(kind, title, sub, lines, btn, cb) {
+    if (!this.ready) { if (cb) cb(); return; }
+    const e = this.el;
+    e.card.className = kind === 'win' ? 'win' : kind === 'lose' ? 'lose' : '';
+    e.mTitle.textContent = title; e.mSub.textContent = sub; e.mBtn.textContent = btn;
+    e.mBody.textContent = '';
+    for (const l of lines) { const li = document.createElement('li'); li.textContent = l.t; if (l.c) li.className = l.c; e.mBody.appendChild(li); }
+    this.modalCb = cb || null;
+    e.modal.classList.add('show');
+  },
+};
+
+/* ============================== Renderer（Canvas 2D） ==============================
+ * 直向螢幕時把地圖轉 90°（12 寬 x 20 高）讓格子夠大好點；
+ * 邏輯座標永遠是 20x12，只有 toPx / fromPx 做轉換。
+ * ================================================================================ */
+const Renderer = {
+  cv: null, ctx: null, cs: 24, portrait: false, w: 0, h: 0,
+
+  init() {
+    this.cv = document.getElementById('cv'); this.ctx = this.cv.getContext('2d');
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    window.addEventListener('orientationchange', () => setTimeout(() => this.resize(), 200));
+  },
+  resize() {
+    const st = document.getElementById('stage');
+    const W = st.clientWidth - 10, H = st.clientHeight - 10;
+    const csL = Math.min(W / C, H / R), csP = Math.min(W / R, H / C);
+    this.portrait = csP > csL * 1.1;
+    Game.portrait = this.portrait;
+    this.cs = Math.max(8, Math.floor(this.portrait ? csP : csL));
+    this.w = this.cs * (this.portrait ? R : C); this.h = this.cs * (this.portrait ? C : R);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.cv.width = this.w * dpr; this.cv.height = this.h * dpr;
+    this.cv.style.width = this.w + 'px'; this.cv.style.height = this.h + 'px';
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  },
+  /** 邏輯座標（格子中心，可為小數）→ 畫面像素 */
+  px(gx, gy) { const s = this.cs; return this.portrait ? [(gy + 0.5) * s, (gx + 0.5) * s] : [(gx + 0.5) * s, (gy + 0.5) * s]; },
+  /** 畫面像素 → 邏輯格子 */
+  cellAt(sx, sy) {
+    const a = Math.floor(sx / this.cs), b = Math.floor(sy / this.cs);
+    return this.portrait ? [b, a] : [a, b];
+  },
+  rect(i, pad) { const [x, y] = this.px(ix(i), iy(i)), s = this.cs; return [x - s / 2 + pad, y - s / 2 + pad, s - pad * 2, s - pad * 2]; },
+
+  draw() {
+    const g = this.ctx, s = this.cs, building = Game.phase === 'build';
+    g.fillStyle = '#10131d'; g.fillRect(0, 0, this.w, this.h);
+
+    // 入口排（依進場權重加深：看得出屍群下一波想從哪來）
+    let wmax = 0; for (const v of Game.spawnWeights) wmax = Math.max(wmax, v);
+    for (let r = 0; r < R; r++) {
+      const [x, y, w, h] = this.rect(idx(0, r), 0);
+      g.fillStyle = `rgba(226,80,74,${0.06 + 0.22 * (Game.spawnWeights[r] / (wmax || 1))})`;
+      g.fillRect(x, y, w, h);
+    }
+    // 格線
+    g.strokeStyle = '#232a3d'; g.lineWidth = 1; g.beginPath();
+    for (let x = 0; x <= this.w; x += s) { g.moveTo(x + .5, 0); g.lineTo(x + .5, this.h); }
+    for (let y = 0; y <= this.h; y += s) { g.moveTo(0, y + .5); g.lineTo(this.w, y + .5); }
+    g.stroke();
+
+    // 記憶熱圖（長期記憶 + 本波尚未併入的死亡）
+    if (UI.heat) {
+      for (let i = 0; i < N; i++) {
+        const d = Memory.danger[i] + Memory.pDanger[i];
+        if (d > 0.05) { const [x, y, w, h] = this.rect(i, 0); g.fillStyle = `rgba(232,60,60,${Math.min(0.7, 0.12 + d * 0.09)})`; g.fillRect(x, y, w, h); }
+        if (Memory.trap[i] > 0) { const [cx, cy] = this.px(ix(i), iy(i)); g.fillStyle = 'rgba(240,201,74,.9)'; g.font = `bold ${s * 0.5}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('!', cx, cy); }
+      }
+    }
+
+    // 建築
+    const T = CONFIG.BUILD.turret;
+    for (let i = 0; i < N; i++) {
+      const c = Grid.cells[i]; if (!c) continue;
+      const [cx, cy] = this.px(ix(i), iy(i));
+      if (c.type === 'wall') {
+        const [x, y, w, h] = this.rect(i, 1.5);
+        g.fillStyle = '#8e94a3'; g.fillRect(x, y, w, h);
+        g.fillStyle = '#6d7383'; g.fillRect(x, y + h * 0.72, w, h * 0.28);
+      } else if (c.type === 'turret') {
+        g.strokeStyle = `rgba(77,155,240,${building ? 0.3 : 0.1})`; g.lineWidth = 1;
+        g.beginPath(); g.arc(cx, cy, T.range * s, 0, 6.283); g.stroke();
+        g.fillStyle = '#243755'; g.fillRect(...this.rect(i, 1.5));
+        g.fillStyle = '#4d9bf0'; g.beginPath(); g.arc(cx, cy, s * 0.32, 0, 6.283); g.fill();
+        g.fillStyle = '#cfe4ff'; g.beginPath(); g.arc(cx, cy, s * 0.1, 0, 6.283); g.fill();
+      } else if (c.type === 'trap') {
+        const [x, y, w, h] = this.rect(i, 3);
+        g.fillStyle = '#a8713f'; g.fillRect(x, y, w, h);
+        g.strokeStyle = '#e0b483'; g.lineWidth = 1; g.setLineDash([2, 2]); g.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5); g.setLineDash([]);
+      } else if (c.type === 'bait') {
+        g.fillStyle = '#f0c94a'; g.beginPath(); g.arc(cx, cy, s * 0.28, 0, 6.283); g.fill();
+        g.fillStyle = '#10131d'; g.font = `bold ${Math.max(8, s * 0.36)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillText(c.uses, cx, cy + 0.5);
+      }
+      const max = CONFIG.BUILD[c.type].hp;
+      if (max && c.hp < max) {   // 受損血條
+        g.fillStyle = '#000'; g.fillRect(cx - s * 0.4, cy + s * 0.32, s * 0.8, 3);
+        g.fillStyle = '#f0c94a'; g.fillRect(cx - s * 0.4, cy + s * 0.32, s * 0.8 * Math.max(0, c.hp / max), 3);
+      }
+    }
+
+    // 突破記憶：藍色外框
+    g.lineWidth = 2;
+    for (let i = 0; i < N; i++) {
+      const b = Memory.breach[i] + Memory.pBreach[i];
+      if (b <= 0) continue;
+      const [x, y, w, h] = this.rect(i, 2);
+      g.strokeStyle = `rgba(90,170,255,${Math.min(1, 0.45 + b * 0.25)})`; g.strokeRect(x, y, w, h);
+    }
+
+    // 核心
+    {
+      const [cx, cy] = this.px(CONFIG.CORE.x, CONFIG.CORE.y);
+      const hit = Game.fx.find(f => f.kind === 'hit');
+      g.fillStyle = hit ? '#ffffff' : 'rgba(95,208,138,.22)'; g.beginPath(); g.arc(cx, cy, s * 0.72, 0, 6.283); g.fill();
+      g.fillStyle = '#5fd08a'; g.beginPath(); g.arc(cx, cy, s * 0.46, 0, 6.283); g.fill();
+      g.fillStyle = '#0d2417'; g.font = `800 ${Math.max(7, s * 0.3)}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.fillText('CORE', cx, cy + 0.5);
+    }
+
+    // 殭屍：軌跡 → 本體 → 血條
+    for (const z of Zombies.list) {
+      const tr = z.trail, r = z.def.radius * s;
+      if (tr.length >= 4) {
+        g.strokeStyle = z.def.color; g.lineCap = 'round';
+        for (let k = 0; k < tr.length - 2; k += 2) {
+          const [ax, ay] = this.px(tr[k], tr[k + 1]), [bx, by] = this.px(tr[k + 2], tr[k + 3]);
+          g.globalAlpha = 0.05 + 0.3 * (k / tr.length); g.lineWidth = r * (0.5 + k / tr.length);
+          g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+        }
+        g.globalAlpha = 1;
+      }
+      const [x, y] = this.px(z.x, z.y);
+      const wob = z.attacking ? Math.sin(Game.time * 30) * 1.5 : 0;
+      g.fillStyle = z.def.color; g.beginPath(); g.arc(x + wob, y, r, 0, 6.283); g.fill();
+      if (z.slow > 0) { g.strokeStyle = '#9fd6ff'; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, r + 1.5, 0, 6.283); g.stroke(); }
+      if (z.stun > 0) { g.fillStyle = '#f0c94a'; g.font = `bold ${s * 0.4}px sans-serif`; g.textAlign = 'center'; g.fillText('?', x, y - r - 6); }
+      const bw = s * 0.7;
+      g.fillStyle = '#000'; g.fillRect(x - bw / 2, y - r - 5, bw, 3);
+      g.fillStyle = '#7be08f'; g.fillRect(x - bw / 2, y - r - 5, bw * Math.max(0, z.hp / z.maxHp), 3);
+    }
+
+    // 特效
+    for (const f of Game.fx) {
+      const k = f.t / f.d;
+      if (f.kind === 'shot') {
+        const [ax, ay] = this.px(f.x1, f.y1), [bx, by] = this.px(f.x2, f.y2);
+        g.strokeStyle = `rgba(200,228,255,${k})`; g.lineWidth = 1.5; g.beginPath(); g.moveTo(ax, ay); g.lineTo(bx, by); g.stroke();
+      } else if (f.kind === 'pop') {
+        const [x, y] = this.px(f.x1, f.y1);
+        g.strokeStyle = f.color; g.globalAlpha = k; g.lineWidth = 2; g.beginPath(); g.arc(x, y, s * (0.3 + (1 - k) * 0.5), 0, 6.283); g.stroke(); g.globalAlpha = 1;
+      }
+    }
+
+    // 滑鼠/手指所在格的預覽
+    if (UI.hover >= 0 && building) {
+      const [x, y, w, h] = this.rect(UI.hover, 1);
+      g.strokeStyle = UI.tool === 'remove' ? '#e2504a' : '#e8e1d2'; g.lineWidth = 1.5; g.strokeRect(x, y, w, h);
+      if (UI.tool === 'turret') {
+        const [cx, cy] = this.px(ix(UI.hover), iy(UI.hover));
+        g.strokeStyle = 'rgba(77,155,240,.6)'; g.setLineDash([4, 4]); g.beginPath(); g.arc(cx, cy, T.range * s, 0, 6.283); g.stroke(); g.setLineDash([]);
+      }
+    }
+  },
+};
+
+/* ============================== Input（觸控 + 滑鼠） ============================== */
+const Input = {
+  down: false, last: -1,
+
+  init() {
+    const cv = Renderer.cv;
+    const cell = (cx, cy) => { const r = cv.getBoundingClientRect(); return Renderer.cellAt(cx - r.left, cy - r.top); };
+    const press = (cx, cy) => { const [x, y] = cell(cx, cy); this.down = true; this.last = idx(x, y); UI.hover = this.last; Game.applyTool(UI.tool, x, y, false); };
+    const move = (cx, cy) => {
+      const [x, y] = cell(cx, cy);
+      if (x < 0 || y < 0 || x >= C || y >= R) { UI.hover = -1; return; }
+      const i = idx(x, y); UI.hover = i;
+      if (this.down && i !== this.last) { this.last = i; Game.applyTool(UI.tool, x, y, true); }  // 拖曳連續建造
+    };
+    const up = () => { this.down = false; };
+
+    if (window.PointerEvent) {   // Pointer Events 同時涵蓋觸控與滑鼠
+      cv.addEventListener('pointerdown', e => { e.preventDefault(); press(e.clientX, e.clientY); });
+      cv.addEventListener('pointermove', e => move(e.clientX, e.clientY));
+      window.addEventListener('pointerup', e => { up(); if (e.pointerType !== 'mouse') UI.hover = -1; });
+      window.addEventListener('pointercancel', up);
+      cv.addEventListener('pointerleave', () => { UI.hover = -1; });
+    } else {                     // 舊瀏覽器：touchstart + mouse/click
+      cv.addEventListener('touchstart', e => { e.preventDefault(); const t = e.changedTouches[0]; press(t.clientX, t.clientY); }, { passive: false });
+      cv.addEventListener('touchmove', e => { e.preventDefault(); const t = e.changedTouches[0]; move(t.clientX, t.clientY); }, { passive: false });
+      cv.addEventListener('touchend', () => { up(); UI.hover = -1; });
+      cv.addEventListener('mousedown', e => press(e.clientX, e.clientY));
+      cv.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+      window.addEventListener('mouseup', up);
+    }
+
+    // 禁止頁面縮放、捲動、長按選單（Log 與報告內容仍可捲）
+    document.addEventListener('touchmove', e => { if (!e.target.closest('#log,#mBody')) e.preventDefault(); }, { passive: false });
+    document.addEventListener('gesturestart', e => e.preventDefault());
+    document.addEventListener('dblclick', e => e.preventDefault());
+    document.addEventListener('contextmenu', e => e.preventDefault());
+  },
+};
+
+/* ============================== 啟動 ============================== */
+function boot() {
+  UI.init(); Renderer.init(); Input.init();
+  Game.reset();
+  let last = performance.now();
+  (function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;   // 限制 dt，切回分頁時不會暴衝
+    // 加速＝每幀多跑幾次固定步長的更新，碰撞與尋路結果和 1x 一致
+    for (let k = 0; k < UI.speed; k++) Game.update(dt);
+    Renderer.draw();
+    requestAnimationFrame(frame);
+  })(last);
+}
+if (typeof document !== 'undefined') boot();
+if (typeof module !== 'undefined') module.exports = { CONFIG, Grid, Memory, Path, Zombies, Game, UI, idx };
+</script>
+</body>
+</html>

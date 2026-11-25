@@ -1,0 +1,114 @@
+  :root{
+    --ink:#ece6d8; --dim:#a3a8bb; --panel:rgba(18,21,33,.84); --line:rgba(255,255,255,.08);
+    --brain:#ef8fab; --go:#e9773b; --hp:#6fdc8c; --bad:#ff6b5e; --gold:#f2cb52; --part:#5fe0ff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:#1b1f2e}
+  body{color:var(--ink);font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;font-size:14px;line-height:1.4;
+       -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+  #app{position:fixed;inset:0}
+  #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+  #fog{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 75% at 50% 52%,transparent 60%,rgba(22,26,40,.35) 86%,rgba(12,14,24,.7) 100%)}
+  #flash{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 120px 30px rgba(255,40,40,.85)}
+
+  #hud{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px;display:flex;gap:6px;align-items:center;pointer-events:none}
+  #hud h1{margin:0 6px 0 0;font-size:16px;font-weight:800;color:var(--brain);white-space:nowrap;text-shadow:0 1px 3px #000}
+  .stat{background:var(--panel);border-radius:8px;padding:3px 9px;text-align:center;min-width:54px}
+  .stat small{display:block;font-size:10px;color:var(--dim)}
+  .stat b{font-size:15px;font-variant-numeric:tabular-nums}
+  #sParts b{color:var(--part)}
+  #brainStat{min-width:56px}
+  #brainBar{height:7px;border-radius:4px;background:#3a2836;overflow:hidden;margin-top:5px}
+  #brainFill{height:100%;width:0;background:var(--brain);transition:width .3s}
+  #brainStat.full #brainFill{animation:brainPulse .6s ease-in-out infinite alternate}
+  @keyframes brainPulse{from{opacity:.55}to{opacity:1}}
+  #hpStat{flex:1;max-width:220px;text-align:left}
+  /* 玩家血條：跟著角色，顯示在腳下；滿血時淡一點，低血變紅 */
+  #pbar{position:absolute;left:0;top:0;width:46px;height:6px;margin:-3px 0 0 -23px;border-radius:3px;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(0,0,0,.35);overflow:hidden;pointer-events:none;transition:opacity .3s;display:none}
+  #pfill{height:100%;width:100%;background:var(--hp);transition:width .2s}
+  #pbar.full{opacity:.4}
+  #pbar.low #pfill{background:var(--bad);animation:brainPulse .5s ease-in-out infinite alternate}
+  #hpBar{height:7px;border-radius:4px;background:#3a2328;overflow:hidden;margin-top:3px}
+  #hpFill{height:100%;width:100%;background:var(--hp);transition:width .2s}
+  #hpStat.low #hpFill{background:var(--bad)}
+  #ticker{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 58px);
+          background:var(--panel);padding:5px 12px;border-radius:14px;font-size:13px;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;pointer-events:none;transition:opacity .4s}
+  #ticker.fade{opacity:0}
+  #ticker.alarm{background:rgba(120,20,20,.9);color:#fff;font-weight:700}
+
+  #report{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 92px);width:min(270px,64vw);font-size:12px;line-height:1.35;padding:7px 10px 6px !important;
+          background:var(--panel);border-left:4px solid var(--brain);border-radius:10px;padding:10px 14px 8px;pointer-events:none;transition:opacity .5s, transform .5s}
+  #report.hide{opacity:0;transform:translate(-50%,-10px)}
+  #report h2{margin:0 0 3px;font-size:13px;color:var(--brain)}
+  #report ul{margin:0;padding-left:0;list-style:none}
+  #report li{margin:2px 0}
+  #report li.comp{margin:0 0 4px;color:var(--gold);font-size:11px;font-variant-numeric:tabular-nums}
+
+  #minimap{position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);border-radius:8px;background:rgba(10,12,20,.75);border:1px solid var(--line);pointer-events:none}
+  .arrow{position:absolute;left:0;top:0;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:22px solid var(--part);
+         filter:drop-shadow(0 0 4px rgba(0,0,0,.8));pointer-events:none;display:none}
+  .arrow.radio{border-bottom-color:var(--hp)}
+  #evac{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 92px);background:rgba(20,60,35,.9);
+        border-radius:12px;padding:8px 16px;font-weight:800;font-size:16px;display:none;pointer-events:none;text-align:center}
+  #evac small{display:block;font-weight:400;font-size:12px;color:#cfe9d6}
+  #evac.out{background:rgba(110,40,20,.9)}
+
+  #bar{position:absolute;left:0;right:0;bottom:0;padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 8px);display:flex;flex-direction:column;gap:6px;pointer-events:none}
+  .row{display:flex;gap:6px;pointer-events:auto}
+  button{font:inherit;color:var(--ink);background:var(--panel);border:2px solid var(--line);border-radius:12px;min-height:52px;padding:4px 6px;cursor:pointer;touch-action:manipulation}
+  button:focus-visible{outline:2px solid var(--brain);outline-offset:2px}
+  .bld{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:700}
+  .bld small{font-weight:400;color:var(--gold);font-size:12px}
+  .bld i{width:16px;height:16px;display:block}
+  .bld.poor{opacity:.45} .bld.poor small{color:var(--bad)}
+  .bld:active{transform:scale(.95)}
+  .i-obstacle{background:repeating-linear-gradient(45deg,#e9a23b 0 4px,#3a3f52 4px 8px);border-radius:2px;height:10px !important;margin-top:6px}
+  .i-trap{background:#a8713f;border-radius:2px}.i-bait{background:radial-gradient(circle at 38% 38%,#d8735a,#8a2e22);border-radius:55% 45% 50% 50%;box-shadow:5px 4px 0 -3px #f3ead8}
+  .opt{flex:1;min-height:40px;font-size:13px;border-radius:10px}
+  .opt.on{border-color:var(--brain);color:var(--brain)}
+  #btnReset.arm{background:var(--bad);color:#fff}
+
+  /* ---------- 手機（觸控）：橫向＋左手虛擬搖桿、右手道具 ---------- */
+  #stick{position:absolute;left:0;top:0;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;display:none;pointer-events:none;
+         background:rgba(255,255,255,.06);border:2px solid rgba(255,255,255,.2);transition:opacity .2s}
+  #stick.idle{opacity:.45}
+  #knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(255,255,255,.38);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+  #rotate{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;text-align:center;background:#141826;color:var(--ink);font-size:18px;font-weight:700;line-height:1.8}
+  #rotate .ph{display:inline-block;font-size:44px;animation:rot 1.6s ease-in-out infinite}
+  @keyframes rot{0%,30%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  body.touch #stick{display:block}
+  body.touch #bar{inset:0;padding:0;display:block}
+  body.touch .row.builds{position:absolute;right:calc(env(safe-area-inset-right,0px) + 16px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
+                         display:grid;grid-template-columns:72px 72px;grid-template-areas:". trap" "obstacle bait";gap:10px;width:auto}
+  body.touch .bld{width:72px;height:72px;min-height:0;border-radius:50%;font-size:12px;padding:0;background:rgba(18,21,33,.72);border-width:2px}
+  body.touch .bld[data-b="obstacle"]{grid-area:obstacle} body.touch .bld[data-b="trap"]{grid-area:trap} body.touch .bld[data-b="bait"]{grid-area:bait}
+  body.touch .bld small{font-size:10px}
+  body.touch .row.opts{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);width:auto;gap:8px}
+  body.touch .opt{min-height:34px;padding:2px 12px;font-size:12px;flex:none}
+  body.touch #minimap{top:calc(env(safe-area-inset-top,0px) + 58px);bottom:auto;right:calc(env(safe-area-inset-right,0px) + 10px)}
+  body.touch #hud{padding-left:calc(env(safe-area-inset-left,0px) + 10px);padding-right:calc(env(safe-area-inset-right,0px) + 10px)}
+  body.touch #report{left:calc(env(safe-area-inset-left,0px) + 10px)}
+  @media (orientation:portrait){ body.touch #rotate{display:flex} }
+  #overlay{position:absolute;inset:0;background:rgba(12,14,22,.72);display:flex;align-items:center;justify-content:center;padding:18px;pointer-events:auto}
+  #overlay.hide{display:none}
+  #ocard{background:#1e2233;border-radius:14px;padding:22px 22px 18px;max-width:430px;width:100%;border-top:4px solid var(--brain);max-height:90vh;overflow-y:auto}
+  #ocard.win{border-top-color:var(--hp)} #ocard.lose{border-top-color:var(--bad)}
+  #ocard h1{margin:0;font-size:30px;font-weight:900}
+  #ocard .tag{margin:4px 0 14px;color:var(--brain);font-size:15px}
+  #ocard p{margin:6px 0;color:var(--dim);font-size:13px}
+  #ocard p b{color:var(--ink);font-weight:600}
+  #obtn{width:100%;margin-top:14px;background:var(--go);color:#1d1107;border:0;font-weight:900;font-size:17px}
+
+  @media (max-width:480px){             /* 手機直向：藏標題，狀態欄平均分配寬度 */
+    #hud h1{display:none}
+    .stat{min-width:0;flex:1;padding:3px 6px}
+    #hpStat{flex:1.4;max-width:none}
+    #brainStat{min-width:0}
+  }
+  @media (min-width:900px) and (min-aspect-ratio:11/10){
+    #bar{flex-direction:row;justify-content:center;align-items:flex-end;padding-bottom:14px}
+    .row.builds{flex:0 1 460px} .row.opts{flex:0 1 300px}
+    .opt{min-height:52px}
+    #hud h1{font-size:20px} .stat{min-width:70px}
+    #minimap{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 62px)}
+  }

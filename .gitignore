@@ -1,0 +1,5 @@
+node_modules/
+dist/
+brain-shift-itch.zip
+.DS_Store
+*.log
