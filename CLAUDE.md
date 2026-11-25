@@ -46,7 +46,8 @@ src/
     zombies.js        殭屍 AI（路徑成本、各類型移動、陷阱／誘餌互動）
     loop.js           撤離、每幀 update、進化觸發、勝負
     report.js         進化報告文字
-  view.js             three.js 場景、模型、特效、鏡頭、霧
+  view.js             three.js 場景、燈光、特效、鏡頭、霧、地板貼圖
+  models.js           程式產生的低面數模型（殭屍四型、玩家、廢墟、沙包、道具）；零件合併成一個幾何＋頂點上色
   ui.js               DOM：狀態列、訊息、報告、小地圖、箭頭、血條
   input.js            鍵盤、滑鼠、觸控虛擬搖桿
   style.css
