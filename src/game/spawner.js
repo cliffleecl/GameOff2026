@@ -1,6 +1,7 @@
 /* 殭屍生成：類型比例來自族群進化；遊蕩殭屍、被發現、屍潮。 */
 import { CFG, C, R, N, idx, ix, iy, inB, clamp, rnd, cellOf, DIR4, DIR8, RADIO, TYPES } from '../config.js';
 import { Feel, FX, Input } from '../fx.js';
+import { t } from '../i18n.js';
 import { Grid } from '../grid.js';
 import { resolve, clearLine, sight, lineHasTrap, lookAhead, steer, hash01 } from '../physics.js';
 import { Memory, knowsTrap } from '../memory.js';
@@ -38,7 +39,7 @@ Object.assign(Game, {
     // 新類型第一次出現：提示牠的特性
     if (this.phase === 'play' && !this.seenTypes[type]) {
       this.seenTypes[type] = true;
-      const intro = { pathfinder: '繞路殭屍出現了：會從前方包抄、預判路線、繞開陷阱', breaker: '拆除殭屍出現了：會去拆你放的障礙', vaulter: '跑酷殭屍出現了：很快，會翻牆、翻你的障礙' }[type];
+      const intro = type === 'rusher' ? null : t('intro.' + type);
       if (intro) FX.msg(intro);
     }
     return z;
@@ -71,7 +72,7 @@ Object.assign(Game, {
   /** 被看到了：這隻開始追；第一次被發現時，屍群才開始派追兵 */
   spot(z) {
     z.mode = 'chase'; z.alertT = 0.9; z.repath = 0; FX.alert(z);
-    if (!this.spotted) { this.spotted = true; this.spawnT = 2; this.hordeT = CFG.HORDE.first; FX.msg('你被發現了！追兵要來了'); }
+    if (!this.spotted) { this.spotted = true; this.spawnT = 2; this.hordeT = CFG.HORDE.first; FX.msg(t('msg.spotted')); }
   },
   chasers() { let n = 0; for (const z of this.zombies) if (z.mode !== 'wander') n++; return n; },
   updateSpawning(dt) {

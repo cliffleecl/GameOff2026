@@ -26,7 +26,7 @@ describe('障礙', () => {
     expect(cs.length).toBe(3);
     expect(cs.every(i => ix(i) === 11)).toBe(true);                 // 前方一格的那一排
     expect(cs.map(iy).sort((a, b) => a - b)).toEqual([9, 10, 11]);
-    expect(Game.materials).toBe(m - CFG.BUILD.obstacle.cost);
+    expect(Game.materials).toBe(m - CFG.ITEM_COST);
     expect(Game.period.placed).toBe(1);
   });
 
@@ -80,5 +80,29 @@ describe('限制', () => {
   it('還沒開始（標題畫面）不能放', () => {
     Game.phase = 'title';
     expect(Game.drop('trap')).toBe(false);
+  });
+});
+
+describe('統一價格、材料上限、路障方向、統計', () => {
+  it('三種道具價格都一樣', () => {
+    for (const ty of ['obstacle', 'trap', 'bait']) expect(Game.costOf(ty)).toBe(CFG.ITEM_COST);
+  });
+  it('撿材料不會超過上限', () => {
+    Game.materials = CFG.MAX_MATERIALS - 2;
+    Game.scraps = [{ id: 1, x: Game.player.x, y: Game.player.y, value: 15 }];
+    Game.updatePickups(0.016);
+    expect(Game.materials).toBe(CFG.MAX_MATERIALS);
+    expect(Game.stats.scraps).toBe(1);
+  });
+  it('路障記錄放置方向（面向下方 → 朝下）', () => {
+    Game.player.face = Math.PI / 2;
+    Game.drop('obstacle');
+    const cs = cellsOf('obstacle');
+    expect(cs.length).toBe(3);
+    for (const c of cs) expect(Grid.cells[c].face).toBeCloseTo(Math.PI / 2);
+  });
+  it('成功放置才算「使用道具」', () => {
+    Game.drop('trap'); Game.materials = 0; Game.drop('trap');
+    expect(Game.stats.items).toBe(1);
   });
 });

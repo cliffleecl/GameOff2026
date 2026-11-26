@@ -12,6 +12,8 @@ import { CFG, RADIO, TYPES } from '../src/config.js';
 import { Grid } from '../src/grid.js';
 import { Memory } from '../src/memory.js';
 import { Game, gameTimers } from '../src/game.js';
+import { I18N, t as tr } from '../src/i18n.js';
+I18N.lang = 'zh-Hant';   // 模擬輸出給設計者看，用繁中
 
 const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i < 0 ? def : (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true); };
@@ -57,7 +59,7 @@ export function run({ nobuild = NOBUILD } = {}) {
         if (nz) {
           const back = Math.atan2(nz.y - P.y, nz.x - P.x), fb = P.face + Math.PI;
           const da = Math.abs(Math.atan2(Math.sin(back - fb), Math.cos(back - fb)));
-          if (da < 0.8 && Game.materials >= CFG.BUILD.obstacle.cost) { Game.drop(nz.type === 'vaulter' ? 'trap' : 'obstacle'); lastDrop = t; }
+          if (da < 0.8 && Game.materials >= CFG.ITEM_COST) { Game.drop(nz.type === 'vaulter' ? 'trap' : 'obstacle'); lastDrop = t; }
         }
       }
     } else if (target) Game.moveTo(target[0], target[1]);
@@ -74,8 +76,8 @@ const res = []; for (let i = 0; i < RUNS; i++) res.push(run());
 const avg = f => (res.reduce((a, r) => a + f(r), 0) / res.length);
 console.log(`${NOBUILD ? '[不用道具] ' : '[用道具]   '}勝率 ${res.filter(r => r.win).length}/${res.length}　平均 ${avg(r => r.t).toFixed(0)} 秒　平均零件 ${avg(r => r.parts).toFixed(1)}/${CFG.PARTS.goal}　平均進化 ${(agg.evolutions / RUNS).toFixed(1)} 次`);
 if (res.some(r => r.timeout)) console.log(`⚠ 有 ${res.filter(r => r.timeout).length} 局超過 ${MAX_T} 秒沒結束（可能卡死，要查）`);
-console.log('各類型生成數：', TYPES.map(t => `${CFG.ZOMBIE[t].name} ${agg.spawned[t] || 0}`).join('　'));
-console.log('各類型造成傷害：', TYPES.map(t => `${CFG.ZOMBIE[t].name} ${agg.dmg[t] || 0}`).join('　'));
+console.log('各類型生成數：', TYPES.map(t => `${tr('z.' + t)} ${agg.spawned[t] || 0}`).join('　'));
+console.log('各類型造成傷害：', TYPES.map(t => `${tr('z.' + t)} ${agg.dmg[t] || 0}`).join('　'));
 console.log(`學習事件（總計）：障礙擋住 ${agg.stuck}　翻越甩掉 ${agg.vaults}　陷阱夾到 ${agg.snared}　閃過陷阱 ${agg.dodged}　誘餌騙到 ${agg.baited}`);
 console.log('最後族群（前 3 局）：', agg.shares.slice(0, 3).join('  ||  '));
 }
