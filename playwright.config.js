@@ -12,7 +12,7 @@ export default defineConfig({
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'test-results/report' }]],
   outputDir: 'test-results/artifacts',
   use: {
-    baseURL: 'http://localhost:4173/',
+    baseURL: 'http://localhost:4174/',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     launchOptions: { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] },
@@ -22,9 +22,10 @@ export default defineConfig({
     { name: 'mobile-landscape', use: { ...devices['Pixel 7 landscape'], viewport: { width: 844, height: 390 } }, testMatch: /mobile/ },
   ],
   webServer: {
-    command: 'npm run build && npx vite preview --port 4173 --strictPort',
-    url: 'http://localhost:4173/',
-    reuseExistingServer: !process.env.CI,
+    // 用自己的埠號、每次都重新建置：避免不小心測到手動開著的舊版 preview
+    command: 'npm run build && npx vite preview --port 4174 --strictPort',
+    url: 'http://localhost:4174/',
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });
