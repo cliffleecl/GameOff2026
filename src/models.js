@@ -38,7 +38,8 @@ export function merge(parts, ao = null) {
 
 /** 角色共用材質：頂點顏色＋可發光的零件（一個材質所有殭屍共用） */
 export function glowMaterial() {
-  const m = new THREE.MeshLambertMaterial({ vertexColors: true });
+  // Phong（逐像素打光）：手電筒的光圈才會清楚；shininess 0 ＝ 不反光，看起來跟 Lambert 一樣霧面
+  const m = new THREE.MeshPhongMaterial({ vertexColors: true, shininess: 0, specular: 0x000000 });
   m.onBeforeCompile = sh => {
     sh.vertexShader = 'attribute float glow;\nvarying float vGlow;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvGlow = glow;');
     sh.fragmentShader = 'varying float vGlow;\n' + sh.fragmentShader.replace(
@@ -235,4 +236,65 @@ export function trapGeo() {
   }
   P.push(part(B(0.5, 0.02, 0.04), 0x9aa0ae, [0, 0.06, 0], [0, 0.5, 0]));          // 彈簧板
   return merge(P);
+}
+
+/** 地上的雜草（純裝飾）：幾片細長的葉子 */
+export function weedGeo() {
+  const P = [];
+  for (let k = 0; k < 5; k++) {
+    const a = k / 5 * Math.PI * 2;
+    P.push(part(new THREE.ConeGeometry(0.03, 0.22 + (k % 2) * 0.08, 3), 0xffffff, [Math.cos(a) * 0.05, 0.11, Math.sin(a) * 0.05], [Math.sin(a) * 0.35, 0, Math.cos(a) * 0.35]));
+  }
+  return merge(P, [0.55, 0, 0.25]);
+}
+
+/* ============================== 通訊器零件（六種） ==============================
+ * 順序跟 i18n 的 part.0~5、icons.js 的 part0~5 一致。藍色的部分會發光，在黑暗裡也找得到。 */
+const METAL = 0x9aa3b5, DARKM = 0x3a4152, GLOW = 0x5fe0ff;
+export function partGeo(k) {
+  switch (k % 6) {
+    case 0: return merge([   // 天線
+      part(CYL(0.025, 0.035, 0.6, 6), METAL, [0, 0.3, 0]), part(B(0.16, 0.06, 0.16), DARKM, [0, 0.03, 0]),
+      part(SPH(0.05, 8, 6), GLOW, [0, 0.62, 0], [0, 0, 0], [1, 1, 1], 1),
+      part(new THREE.TorusGeometry(0.1, 0.012, 4, 12, Math.PI), GLOW, [0, 0.45, 0], [0, 0, 0], [1, 1, 1], 0.8)]);
+    case 1: return merge([   // 電池
+      part(B(0.34, 0.2, 0.2), DARKM, [0, 0.1, 0]), part(B(0.36, 0.06, 0.21), GLOW, [0, 0.1, 0], [0, 0, 0], [1, 1, 1], 0.9),
+      part(CYL(0.03, 0.03, 0.05, 6), METAL, [0.1, 0.22, 0]), part(CYL(0.03, 0.03, 0.05, 6), 0xd9483f, [-0.1, 0.22, 0])]);
+    case 2: { const P = [part(B(0.4, 0.03, 0.3), 0x2f6b40, [0, 0.015, 0]), part(B(0.14, 0.05, 0.12), 0x1e222e, [0, 0.05, 0])];   // 電路板
+      for (let j = 0; j < 3; j++) P.push(part(B(0.3, 0.008, 0.012), GLOW, [0, 0.035, -0.1 + j * 0.1], [0, 0, 0], [1, 1, 1], 0.9));
+      P.push(part(CYL(0.03, 0.03, 0.07, 8), 0xe9a23b, [0.13, 0.06, 0.08]));
+      return merge(P); }
+    case 3: return merge([   // 喇叭
+      part(B(0.3, 0.3, 0.12), DARKM, [0, 0.15, 0]), part(CYL(0.1, 0.1, 0.02, 14), 0x1e222e, [0, 0.15, 0.065], [Math.PI / 2, 0, 0]),
+      part(CYL(0.04, 0.04, 0.025, 10), GLOW, [0, 0.15, 0.07], [Math.PI / 2, 0, 0], [1, 1, 1], 0.9)]);
+    case 4: return merge([   // 話筒
+      part(B(0.08, 0.06, 0.34), DARKM, [0, 0.05, 0]), part(B(0.12, 0.1, 0.1), DARKM, [0, 0.06, 0.16]), part(B(0.12, 0.1, 0.1), DARKM, [0, 0.06, -0.16]),
+      part(B(0.06, 0.02, 0.2), GLOW, [0, 0.085, 0], [0, 0, 0], [1, 1, 1], 0.8)]);
+    default: return merge([  // 調頻旋鈕
+      part(CYL(0.16, 0.18, 0.08, 16), METAL, [0, 0.04, 0]), part(CYL(0.1, 0.1, 0.1, 12), DARKM, [0, 0.12, 0]),
+      part(B(0.02, 0.02, 0.1), GLOW, [0, 0.175, 0.04], [0, 0, 0], [1, 1, 1], 1),
+      part(new THREE.TorusGeometry(0.17, 0.012, 4, 20), GLOW, [0, 0.085, 0], [Math.PI / 2, 0, 0], [1, 1, 1], 0.7)]);
+  }
+}
+
+/* ============================== 救援直升機 ==============================
+ * body：機身＋座艙＋尾桁＋起落架（一個 mesh）；rotor：主旋翼；tail：尾旋翼（分開才能轉） */
+export function heliGeos() {
+  const BODY = 0x4b5a3e, BODY_D = 0x38442e, GLASS = 0x9fd6ff;
+  const body = merge([
+    part(SPH(0.7, 12, 8), BODY, [0, 1.0, 0.2], [0, 0, 0], [0.85, 0.75, 1.35]),                // 機身
+    part(SPH(0.55, 12, 8), GLASS, [0, 1.12, 0.85], [0, 0, 0], [0.75, 0.62, 0.7], 0.35),       // 座艙玻璃（微微發亮）
+    part(CYL(0.16, 0.08, 2.4, 8), BODY, [0, 1.15, -1.55], [Math.PI / 2, 0, 0]),               // 尾桁
+    part(B(0.06, 0.6, 0.35), BODY_D, [0, 1.45, -2.7]),                                         // 垂直尾翼
+    part(B(0.7, 0.05, 0.25), BODY_D, [0, 1.2, -2.5]),                                          // 水平尾翼
+    part(CYL(0.12, 0.12, 0.2, 8), 0x2a2e3c, [0, 1.65, 0.1]),                                   // 旋翼軸
+    part(B(0.06, 0.06, 1.9), 0x2a2e3c, [0.5, 0.25, 0.2]), part(B(0.06, 0.06, 1.9), 0x2a2e3c, [-0.5, 0.25, 0.2]),   // 起落架
+    part(B(0.05, 0.4, 0.05), 0x2a2e3c, [0.42, 0.45, 0.7], [0, 0, -0.3]), part(B(0.05, 0.4, 0.05), 0x2a2e3c, [-0.42, 0.45, 0.7], [0, 0, 0.3]),
+    part(B(0.05, 0.4, 0.05), 0x2a2e3c, [0.42, 0.45, -0.3], [0, 0, -0.3]), part(B(0.05, 0.4, 0.05), 0x2a2e3c, [-0.42, 0.45, -0.3], [0, 0, 0.3]),
+    part(B(0.5, 0.18, 0.04), 0xf2f2f2, [0, 1.0, -0.35], [0, 0, 0], [1, 1, 1]),                 // 機身白條
+    part(SPH(0.06, 6, 4), 0xff4040, [0, 1.75, -2.85], [0, 0, 0], [1, 1, 1], 1),               // 尾燈
+  ]);
+  const rotor = merge([part(B(4.2, 0.03, 0.2), 0x1e222e, [0, 0, 0]), part(B(0.2, 0.03, 4.2), 0x1e222e, [0, 0, 0])]);
+  const tail = merge([part(B(0.04, 0.7, 0.08), 0x1e222e, [0, 0, 0])]);
+  return { body, rotor, tail };
 }

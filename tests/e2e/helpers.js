@@ -1,16 +1,17 @@
-/* E2E 共用：固定亂數種子、收集錯誤、等遊戲載入。 */
+/* E2E 共用：固定亂數種子、固定語言、收集錯誤、等遊戲載入。 */
 import { expect } from '@playwright/test';
 
-/** 在頁面任何程式執行前，把 Math.random 換成固定種子（同一張地圖、同一批殭屍） */
-export async function seed(page, s = 12345) {
-  await page.addInitScript(s0 => {
+/** 在頁面任何程式執行前，把 Math.random 換成固定種子（同一張地圖、同一批殭屍），並固定語言 */
+export async function seed(page, s = 12345, lang = 'zh-Hant') {
+  await page.addInitScript(({ s0, l }) => {
     let a = s0 >>> 0;
     Math.random = () => {
       a = (a + 0x6d2b79f5) >>> 0; let t = a;
       t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-  }, s);
+    try { if (l) localStorage.setItem('bs-lang', l); localStorage.removeItem('bs-tune'); } catch { /* 沒有 storage 也沒關係 */ }
+  }, { s0: s, l: lang });
 }
 
 /** 收集 console.error 與未捕捉的例外；測試結束時應該是空的 */
@@ -21,17 +22,18 @@ export function collectErrors(page) {
   return errors;
 }
 
-export async function boot(page, { seedValue = 12345 } = {}) {
-  await seed(page, seedValue);
+export async function boot(page, { seedValue = 12345, lang = 'zh-Hant' } = {}) {
+  await seed(page, seedValue, lang);
   const errors = collectErrors(page);
   await page.goto('./');
   await page.waitForFunction(() => window.BS && window.BS.View.r);
   return errors;
 }
 
+/** 從標題畫面按「開始遊戲」 */
 export async function start(page) {
-  await page.locator('#obtn').click();
-  await expect(page.locator('#overlay')).toHaveClass(/hide/);
+  await page.locator('#btnStart').click();
+  await expect(page.locator('#title')).toHaveClass(/hide/);
   await expect.poll(() => page.evaluate(() => BS.Game.phase)).toBe('play');
 }
 

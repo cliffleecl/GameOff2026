@@ -1,6 +1,7 @@
 /* 撤離流程、每幀更新、進化觸發、勝負。 */
 import { CFG, C, R, N, idx, ix, iy, inB, clamp, rnd, cellOf, DIR4, DIR8, RADIO, TYPES } from '../config.js';
 import { Feel, FX, Input } from '../fx.js';
+import { t } from '../i18n.js';
 import { Grid } from '../grid.js';
 import { resolve, clearLine, sight, lineHasTrap, lookAhead, steer, hash01 } from '../physics.js';
 import { Memory, knowsTrap } from '../memory.js';
@@ -41,7 +42,7 @@ Object.assign(Game, {
         else if (z.hadSight && !see && (z.unseenT += dt) > 2.5) { z.hadSight = false; this.period.losEsc++; }
       }
       if (d < 2) z.close = true;
-      else if (z.close && d > 8) { z.close = false; Memory.wEscape++; this.period.escapes++; this.period.esc[z.type]++; }
+      else if (z.close && d > 8) { z.close = false; Memory.wEscape++; this.period.escapes++; this.stats.escapes++; this.period.esc[z.type]++; }
       // 殭屍殺不死：跟丟你太久就散掉
       const lost = d > 14 && z.mode !== 'ambush' && z.mode !== 'wander' && z.mode !== 'demolish';
       z.lostT = lost ? z.lostT + dt : 0;

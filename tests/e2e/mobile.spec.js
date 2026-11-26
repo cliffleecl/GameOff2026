@@ -21,7 +21,12 @@ test('觸控版面：搖桿在左、道具按鈕在右下、都在畫面內、�
   expect(stick.x + stick.width / 2).toBeLessThan(vw / 2);  // 左手
   const mm = await box(page.locator('#minimap'));
   for (const b of btns) expect(overlap(b, mm)).toBe(false);
-  for (const id of ['#btnSpeed', '#btnMem', '#btnReset']) { const o = await box(page.locator(id)); for (const b of btns) expect(overlap(o, b), id).toBe(false); }
+  // HUD 三格在畫面內、不跟小地圖重疊
+  for (const id of ['#sParts', '#sTime', '#brainStat']) {
+    const o = await box(page.locator(id));
+    expect(o.x).toBeGreaterThanOrEqual(0); expect(o.x + o.width).toBeLessThanOrEqual(vw);
+    expect(overlap(o, mm), id).toBe(false);
+  }
   await info.attach('mobile', { body: await page.screenshot(), contentType: 'image/png' });
   expect(errors).toEqual([]);
 });
@@ -52,4 +57,26 @@ test('直向顯示「請轉成橫向」', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await boot(page);
   await expect(page.locator('#rotate')).toBeVisible();
+});
+
+test('手機橫向：標題畫面的按鈕都在畫面內、按得到', async ({ page }, info) => {
+  await boot(page);
+  for (const id of ['#btnStart', '#btnHow', '#btnLang']) {
+    const b = await box(page.locator(id));
+    expect(b.y + b.height, id).toBeLessThanOrEqual(390);
+    expect(b.height, id).toBeGreaterThanOrEqual(40);
+  }
+  await info.attach('mobile-title', { body: await page.screenshot(), contentType: 'image/png' });
+  await page.locator('#btnStart').tap();
+  await expect.poll(() => page.evaluate(() => BS.Game.phase)).toBe('play');
+});
+
+test('手機橫向：結算畫面放得下、按鈕看得到', async ({ page }, info) => {
+  await boot(page);
+  await start(page);
+  await page.evaluate(() => { BS.Game.player.hp = 0; });
+  await expect(page.locator('#result')).toBeVisible();
+  const b = await box(page.locator('#btnAgain'));
+  expect(b.y + b.height).toBeLessThanOrEqual(390);
+  await info.attach('mobile-result', { body: await page.screenshot(), contentType: 'image/png' });
 });
