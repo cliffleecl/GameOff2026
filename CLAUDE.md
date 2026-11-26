@@ -15,7 +15,7 @@ H5 遊戲（Game Jam 主題「Shift」）：跑酷逃生 × 會進化的殭屍�
 ```bash
 npm install
 npm run dev        # Vite 開發伺服器（--host，手機可用同網段連進來）
-npm run sim        # 模擬玩家 30 局；-- --runs 100 指定局數；-- --nobuild 不用道具的對照組
+npm run sim        # 模擬玩家 30 局；-- --runs 100 指定局數；-- --nobuild 不用道具的對照組；-- --cfg tune.json 套用調過的參數
 npm test           # 單元測試（Vitest，只測邏輯層，約 10 秒）
 npm run test:e2e   # E2E（Playwright，打包後在電腦＋手機橫向跑；很吃 CPU，平常交給 GitHub Actions）
 npm run build      # 輸出到 dist/
@@ -24,13 +24,22 @@ npm run zip        # build + 壓成 brain-shift-itch.zip
 npm run itch       # build + butler push（需環境變數 ITCH_TARGET=帳號/遊戲:html5）
 ```
 
+## 調參數（給設計者）
+
+- 所有數值在 `src/config.js` 的 `CFG`，每個數值旁邊有註解。`npm run dev` 開著時存檔，瀏覽器會自動重新載入。
+- **不改程式也能調**：遊戲網址加 `?tune`（例如 `http://localhost:5173/?tune`，GitHub Pages 上也可以），或在遊戲中按 `` ` `` 鍵，會出現參數面板：
+  - 改了馬上生效（速度、傷害、視野…）；開局才用到的（材料箱數量、地圖生成…）按「重開一局」。
+  - 改過的值存在這台瀏覽器，左下角會出現「已套用調整參數」提醒；「全部還原」回到預設。
+  - 「複製修改（JSON）」→ 存成檔案 → `npm run sim -- --cfg 檔案.json` 用同一組數值跑模擬；確定要用就貼給 Claude 寫進 `config.js`。
+
 ## 架構
 
 ```
 index.html            頁面骨架（HUD、按鈕、開場／結算卡片）
 src/
   main.js             進入點與主迴圈（打擊停頓、慢動作、加速都在這裡）
-  config.js           ★ 所有數值（CFG）與共用小工具（idx、cellOf、clamp…）
+  config.js           ★ 所有數值（CFG）與共用小工具（idx、cellOf、clamp…）；applyCfg／cfgDiff／resetCfg（調參數用）
+  i18n.js             多國語言（en／zh-Hant／zh-Hans）：t('key', {參數})；邏輯層也能用
   fx.js               Feel（手感開關）、FX（邏輯→表現的事件）、Input（移動輸入）
   grid.js             地圖：rock 廢墟、low 矮牆、cells 玩家放的設施；地圖生成
   physics.js          碰撞、視線、直線檢查、路徑拉直（lookAhead）、速度混合（steer）
@@ -48,7 +57,10 @@ src/
     report.js         進化報告文字
   view.js             three.js 場景、燈光、特效、鏡頭、霧、地板貼圖
   models.js           程式產生的低面數模型（殭屍四型、玩家、廢墟、沙包、道具）；零件合併成一個幾何＋頂點上色
-  ui.js               DOM：狀態列、訊息、報告、小地圖、箭頭、血條
+  ui.js               DOM：標題、如何遊玩、HUD、訊息、報告、小地圖、箭頭、血條＋材料條、結算、語言切換
+  icons.js            介面圖示（內嵌 SVG：零件六種、時間、屍腦、道具）
+  tuning.js           調參數：開局前套用瀏覽器存的覆寫值；?tune 或 ` 鍵打開面板
+  tune-panel.js       參數面板（lil-gui，打開時才載入）
   input.js            鍵盤、滑鼠、觸控虛擬搖桿
   style.css
 sim/sim.mjs           模擬玩家（Node 直接跑邏輯層；也 export run() 給測試用）
@@ -72,7 +84,8 @@ docs/DESIGN.md        設計文件
 4. **改完畫面或操作，要實際在瀏覽器看**：電腦（約 1280×760）和手機橫向（約 844×390，觸控）。直向觸控會顯示「請轉成橫向」，這是預期行為。
 5. **發佈路徑必須是相對路徑**（`vite.config.js` 的 `base: './'`）。同一份 `dist/` 要能同時放在 itch.io 的 zip 和 GitHub Pages 的子路徑。不要引用外部 CDN，three 走 npm（固定 `0.128.0`，升版要整個重測 view.js）。
 6. **測試**：改了規則就補 `tests/unit/`；改了畫面、操作、DOM 結構就確認 `tests/e2e/` 還對。E2E 不做逐像素比對（WebGL＋亂數不穩定），而是用 `window.BS` 檢查狀態、截圖附在報告裡。測試用固定亂數種子（`tests/helpers/seed.js`），不用改遊戲程式。
-7. **更新文件**：改了規則、數值範圍或設計決定，同步改 `docs/DESIGN.md`（第 9 節的決定紀錄、第 10 節的已知問題）。
+7. **所有玩家看得到的文字都走 `i18n.js`**，三種語言都要寫（英文是主要客群，先寫英文）。`tests/unit/i18n.test.js` 會檢查三種語言的 key 和參數是否一致。
+8. **更新文件**：改了規則、數值範圍或設計決定，同步改 `docs/DESIGN.md`（第 9 節的決定紀錄、第 10 節的已知問題）。
 
 ## 設計原則（做決定時用這些判斷）
 
