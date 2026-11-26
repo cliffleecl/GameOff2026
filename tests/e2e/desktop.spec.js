@@ -87,7 +87,8 @@ test('滑鼠點地面 → 走過去', async ({ page }) => {
   const a = await state(page);
   const target = await page.evaluate(({ x, y }) => BS.View.toScreen(x + 3, y), a);
   await page.mouse.click(target.x, target.y);
-  await expect.poll(async () => (await state(page)).x, { timeout: 15000 }).toBeGreaterThan(a.x + 2);
+  // CI 一秒只有 1～2 幀，走 2 格要十幾秒：門檻 1 格、等久一點
+  await expect.poll(async () => (await state(page)).x, { timeout: 40000 }).toBeGreaterThan(a.x + 1);
 });
 
 test('主角在畫面正中央', async ({ page }) => {
