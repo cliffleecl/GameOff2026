@@ -51,7 +51,7 @@ export const UI = {
     document.body.classList.toggle('menu', !!which);       // 選單開著時藏 HUD、道具按鈕、搖桿
     this.screen = which;
   },
-  start() { this.show(null); Game.begin(); },
+  start() { this.show(null); Game.begin(); View.camSnap = true; },
   restart(play) {
     for (const o of View.zMap.values()) View.scene.remove(o.g);
     for (const c of View.corpses) View.scene.remove(c.o.g);

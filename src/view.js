@@ -622,7 +622,8 @@ export const View = {
     let tx, tz;
     if (this.portrait) { tx = clamp(px, -ext[1], ext[1]); tz = clamp(pz, -ext[0], ext[0]); }
     else { tx = clamp(px, -ext[0], ext[0]); tz = clamp(pz, -ext[1], ext[1]); }
-    const kc = Math.min(1, real * 6);
+    // 剛開局（從標題畫面切過來）鏡頭直接對準主角，不要慢慢飄過去
+    const kc = this.camSnap ? 1 : Math.min(1, real * 6); this.camSnap = false;
     this.camLook.x += (tx - this.camLook.x) * kc; this.camLook.z += (tz - this.camLook.z) * kc;
     if (Game.phase === 'title') {
       // 標題畫面：鏡頭慢慢繞著無線電轉，角色在畫面右半邊（左半邊留給 Logo）
