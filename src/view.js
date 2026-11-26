@@ -7,7 +7,11 @@ import { lerpAngle, hash01 } from './physics.js';
 import { Memory } from './memory.js';
 import { Game } from './game.js';
 import { UI } from './ui.js';
-import { glowMaterial, zombieGeos, ZOMBIE_LOOK, playerGeos, ruinGeos, sandbagGeo, rubbleGeo, obstacleGeo, trapGeo } from './models.js';
+import { glowMaterial, zombieGeos, ZOMBIE_LOOK, playerGeos, ruinGeos, sandbagGeo, rubbleGeo, obstacleGeo, trapGeo, weedGeo, partGeo, heliGeos } from './models.js';
+import { t as tr } from './i18n.js';
+
+/** 霧面材質：Phong（逐像素打光）讓手電筒光圈清楚；shininess 0 ＝ 不反光 */
+const phong = o => new THREE.MeshPhongMaterial(Object.assign({ shininess: 0, specular: 0x000000 }, o));
 
 const MAX_BLOBS = 80;   // 腳下圓形陰影（殭屍用，一次畫完）的上限
 
@@ -23,27 +27,36 @@ export const View = {
 
   init() {
     const cv = document.getElementById('cv');
-    // 手機：解析度上限 1.5 倍（高 DPI 螢幕畫 2 倍很吃 GPU，肉眼差不多）
+    // 手機：解析度上限 1.25 倍。實測幀時間幾乎跟像素數成正比（陰影、光源的影響小很多），高 DPI 螢幕畫 2 倍不划算
     this.mobile = window.matchMedia('(pointer: coarse)').matches;
     this.r = new THREE.WebGLRenderer({ canvas: cv, antialias: true, powerPreference: 'high-performance' });
-    this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.mobile ? 1.5 : 2));
+    this.r.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.mobile ? 1.25 : 2));
     this.r.shadowMap.enabled = true; this.r.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x1b1f2e);
-    this.scene.fog = new THREE.Fog(0x1a1e2c, 18, 36);   // 依鏡頭距離在 resize 裡調整
+    this.scene = new THREE.Scene(); this.scene.background = new THREE.Color(0x07080e);
+    this.scene.fog = new THREE.Fog(0x07080e, 18, 36);   // 依鏡頭距離在 resize 裡調整
     this.cam = new THREE.PerspectiveCamera(42, 1, 0.1, 120);
     this.camDir = new THREE.Vector3(0, 0.82, 0.57).normalize();
     this.camLook = new THREE.Vector3();
-    // 月光：天空偏藍、地面偏紫；主光從左上斜照，陰影拉長一點比較有夜晚感
-    this.scene.add(new THREE.HemisphereLight(0xb9c6ff, 0x2a2233, 0.62));
-    const sun = new THREE.DirectionalLight(0xdfe6ff, 0.78);
-    sun.castShadow = true; sun.shadow.mapSize.set(this.mobile ? 1024 : 2048, this.mobile ? 1024 : 2048); sun.shadow.bias = -0.0015;
+    // 夜晚：環境光和月光都壓得很暗，主要靠手電筒看路（殭屍的發光眼睛在黑暗裡最先被看到）
+    this.scene.add(new THREE.HemisphereLight(0x7f8fcf, 0x1a1626, 0.24));
+    const sun = new THREE.DirectionalLight(0xbfcaff, 0.2);
+    sun.castShadow = !this.mobile; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0015;
     Object.assign(sun.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, near: 1, far: 50 });
     this.scene.add(sun, sun.target); this.sun = sun;
-    // 玩家身邊一圈暖光：角色附近永遠看得清楚（重要資訊在角色附近）
-    this.pLight = new THREE.PointLight(0xffc48a, 0.75, 6.5, 1.6); this.scene.add(this.pLight);
-    // 無線電的燈：平常紅、可以撤離時變綠
-    this.rLight = new THREE.PointLight(0xff5040, 0.8, 7, 1.8); this.scene.add(this.rLight);
-    this.makeArena(); this.makeShared(); this.makePlayer(); this.makePools(); this.makeOverlay(); this.makeRadio();
+    // 手電筒：從角色胸口往面向的方向照，廢墟會擋住光（有陰影）
+    this.flash = new THREE.SpotLight(0xfff0d0, 3.2, 13, 0.6, 0.5, 1.1);
+    this.flash.castShadow = true; this.flash.shadow.mapSize.set(512, 512); this.flash.shadow.bias = -0.002;
+    Object.assign(this.flash.shadow.camera, { near: 0.3, far: 13 });
+    this.scene.add(this.flash, this.flash.target);
+    // 角色身邊一小圈微光：背後也看得到自己和貼身的殭屍
+    this.pLight = new THREE.PointLight(0xffc48a, 0.55, 3.6, 1.6); this.scene.add(this.pLight);
+    // 即時光源只留這 4 個（環境、月光、手電筒、身邊微光）：每多一個光源，每個像素都要多算一次，手機最吃這個。
+    // 無線電燈光、直升機探照燈改用「地面發光貼圖」假裝，看起來差不多、幾乎不花效能。
+    const gc = document.createElement('canvas'); gc.width = gc.height = 64; const gg = gc.getContext('2d');
+    const grd = gg.createRadialGradient(32, 32, 0, 32, 32, 32); grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.4, 'rgba(255,255,255,.35)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    gg.fillStyle = grd; gg.fillRect(0, 0, 64, 64);
+    this.glowTex = new THREE.CanvasTexture(gc);
+    this.makeArena(); this.makeShared(); this.makePlayer(); this.makePools(); this.makeOverlay(); this.makeRadio(); this.makeHeli();
     // 霧團貼圖：柔邊圓形
     const fc = document.createElement('canvas'); fc.width = fc.height = 64; const fg = fc.getContext('2d');
     const gr = fg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(190,200,230,0.9)'); gr.addColorStop(1, 'rgba(190,200,230,0)');
@@ -77,12 +90,12 @@ export const View = {
     this.floorCv = document.createElement('canvas'); this.floorCv.width = C * 32; this.floorCv.height = R * 32;
     this.floorTex = new THREE.CanvasTexture(this.floorCv); this.floorTex.anisotropy = 4;
     // 地板切成每格一塊：Lambert 是逐頂點打光，切細了玩家身邊的暖光才照得到地板
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(C, R, C, R), new THREE.MeshLambertMaterial({ map: this.floorTex }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(C, R, C, R), phong({ map: this.floorTex }));
     floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; this.scene.add(floor);
-    const out = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), new THREE.MeshLambertMaterial({ color: 0x1d2134 }));
+    const out = new THREE.Mesh(new THREE.PlaneGeometry(140, 140), phong({ color: 0x14161f }));
     out.rotation.x = -Math.PI / 2; out.position.y = -0.02; this.scene.add(out);
     // 外牆：磚牆＋上緣鐵絲網的柱子，壓暗配合霧氣
-    const wm = new THREE.MeshLambertMaterial({ color: 0x4a3c3e }), wt = new THREE.MeshLambertMaterial({ color: 0x5c4c4e }), pm = new THREE.MeshLambertMaterial({ color: 0x3a3d48 });
+    const wm = phong({ color: 0x4a3c3e }), wt = phong({ color: 0x5c4c4e }), pm = phong({ color: 0x3a3d48 });
     const mk = (w, d, x, z) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1.1, d), wm); m.position.set(x, 0.55, z); m.castShadow = m.receiveShadow = true; this.scene.add(m);
       const t = new THREE.Mesh(new THREE.BoxGeometry(w + 0.1, 0.08, d + 0.1), wt); t.position.set(x, 1.12, z); this.scene.add(t);
@@ -102,7 +115,7 @@ export const View = {
   buildRocks() {
     for (const m of this.envMeshes || []) { this.scene.remove(m); m.dispose && m.dispose(); }
     this.envMeshes = [];
-    if (!this.envGeo) this.envGeo = { ruins: ruinGeos(), sand: sandbagGeo(), rubble: rubbleGeo(), mat: new THREE.MeshLambertMaterial({ vertexColors: true }) };
+    if (!this.envGeo) this.envGeo = { ruins: ruinGeos(), sand: sandbagGeo(), rubble: rubbleGeo(), weed: weedGeo(), mat: phong({ vertexColors: true }) };
     const E = this.envGeo, mat = new THREE.Matrix4(), q = new THREE.Quaternion(), col = new THREE.Color(), up = new THREE.Vector3(0, 1, 0);
     const inst = (geo, list, shadow) => {
       const m = new THREE.InstancedMesh(geo, E.mat, Math.max(1, list.length));
@@ -141,47 +154,99 @@ export const View = {
         col: new THREE.Color().setHSL(0.62, 0.08, 0.42 + hash01(i, 26) * 0.1) });
     }
     inst(E.rubble, rub, false);
+    // 雜草：從裂縫和廢墟腳邊長出來
+    const weeds = [];
+    for (let i = 0; i < N; i++) {
+      if (Grid.rock[i] || Grid.low[i] || hash01(i, 41) > 0.16) continue;
+      const [x, z] = W2(ix(i) + hash01(i, 42), iy(i) + hash01(i, 43));
+      weeds.push({ pos: new THREE.Vector3(x, 0, z), rot: hash01(i, 44) * 6.28, scale: new THREE.Vector3(1, 1, 1).multiplyScalar(0.7 + hash01(i, 45) * 0.8),
+        col: new THREE.Color().setHSL(0.22 + hash01(i, 46) * 0.06, 0.3, 0.3 + hash01(i, 47) * 0.1) });
+    }
+    inst(E.weed, weeds, false);
     this.paintFloor();
   },
-  /** 地板：柏油底、裂縫、污漬、淡淡的格線（放道具時看得出格子），廢墟和沙包腳邊畫上接觸陰影 */
+  /** 地板：城市廢墟的地面（柏油、碎掉的水泥板、泥土、雜草、褪色的道路標線、水窪、人孔蓋），不畫格線。
+   *  每局重畫一次；地形（廢墟、沙包）旁邊畫接觸陰影和灰塵，讓它們「站」在地上。 */
   paintFloor() {
-    const S = 32, g = this.floorCv.getContext('2d'), W = C * S, H = R * S;
-    g.fillStyle = '#272c44'; g.fillRect(0, 0, W, H);
-    for (let i = 0; i < N; i++) {     // 每格亮度一點點不同，像一塊塊鋪面
-      const v = hash01(i, 31); if (v < 0.5) continue;
-      g.fillStyle = `rgba(255,255,255,${(v - 0.5) * 0.05})`; g.fillRect(ix(i) * S, iy(i) * S, S, S);
+    const S = 32, g = this.floorCv.getContext('2d'), W = C * S, H = R * S, rnd01 = Math.random;
+    const blot = (x, y, r, c, sy = 1) => { g.save(); g.translate(x, y); g.scale(1, sy); const gr = g.createRadialGradient(0, 0, 0, 0, 0, r); gr.addColorStop(0, c); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(-r, -r, r * 2, r * 2); g.restore(); };
+    /** 低解析度亂數 → 放大（平滑），做出大片、不規則的明暗變化 */
+    const noise = (cols, rows, alpha, col) => {
+      const c = document.createElement('canvas'); c.width = cols; c.height = rows; const cg = c.getContext('2d');
+      for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) { cg.fillStyle = `rgba(${col},${(rnd01() * alpha).toFixed(3)})`; cg.fillRect(x, y, 1, 1); }
+      g.imageSmoothingEnabled = true; g.drawImage(c, 0, 0, W, H);
+    };
+    g.fillStyle = '#252836'; g.fillRect(0, 0, W, H);
+    noise(14, 10, 0.5, '12,13,20'); noise(14, 10, 0.18, '120,125,140'); noise(60, 45, 0.22, '8,9,14');
+    // 碎掉的水泥板：不規則的多邊形，比柏油亮一點，接縫歪歪的（不跟格子對齊）
+    for (let k = 0; k < 14; k++) {
+      const cx = rnd01() * W, cy = rnd01() * H, rad = 60 + rnd01() * 140, n = 6 + (rnd01() * 4 | 0), rot = rnd01() * 6.28;
+      g.beginPath();
+      for (let j = 0; j < n; j++) { const a = rot + j / n * 6.283, r = rad * (0.6 + rnd01() * 0.5); g[j ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+      g.closePath(); g.fillStyle = `rgba(78,82,96,${0.25 + rnd01() * 0.2})`; g.fill();
+      g.save(); g.clip(); g.strokeStyle = 'rgba(10,11,18,.45)'; g.lineWidth = 2; g.translate(cx, cy); g.rotate(rot);
+      for (let d = -rad; d < rad; d += 38 + rnd01() * 30) { g.beginPath(); g.moveTo(d, -rad); g.lineTo(d + (rnd01() - 0.5) * 12, rad); g.stroke(); }
+      for (let d = -rad; d < rad; d += 38 + rnd01() * 30) { g.beginPath(); g.moveTo(-rad, d); g.lineTo(rad, d + (rnd01() - 0.5) * 12); g.stroke(); }
+      g.restore();
     }
-    for (let k = 0; k < 9000; k++) {  // 柏油顆粒
-      const x = Math.random() * W, y = Math.random() * H, l = Math.random() < 0.5;
-      g.fillStyle = l ? 'rgba(200,210,255,.07)' : 'rgba(0,0,0,.18)'; g.fillRect(x, y, 1.5, 1.5);
-    }
-    const blot = (x, y, r, c) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, c); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); };
-    for (let k = 0; k < 26; k++) blot(Math.random() * W, Math.random() * H, 30 + Math.random() * 70, 'rgba(8,10,18,.35)');      // 油污、水漬
-    for (let k = 0; k < 8; k++) blot(Math.random() * W, Math.random() * H, 20 + Math.random() * 30, 'rgba(70,90,40,.22)');     // 屍水
-    g.strokeStyle = 'rgba(10,12,20,.55)'; g.lineCap = 'round';
-    for (let k = 0; k < 34; k++) {    // 裂縫：隨機折線，越畫越細
-      let x = Math.random() * W, y = Math.random() * H, a = Math.random() * 6.28, w = 2.2;
-      g.beginPath(); g.moveTo(x, y);
-      for (let j = 0; j < 7 + Math.random() * 8; j++) { a += (Math.random() - 0.5) * 1.2; x += Math.cos(a) * 14; y += Math.sin(a) * 14; g.lineWidth = w; g.lineTo(x, y); w *= 0.88; }
+    // 褪色的道路：一條橫、一條直，標線斷斷續續（被廢墟壓過去也沒關係，像原本的街道）
+    const road = (hor, at) => {
+      g.save(); g.fillStyle = 'rgba(16,17,24,.4)';
+      if (hor) g.fillRect(0, at - S * 1.6, W, S * 3.2); else g.fillRect(at - S * 1.6, 0, S * 3.2, H);
+      const len = hor ? W : H;
+      for (let d = 0; d < len; d += 46) {
+        if (rnd01() < 0.3) continue;                                  // 磨掉的
+        g.fillStyle = `rgba(214,190,110,${0.12 + rnd01() * 0.14})`;
+        if (hor) g.fillRect(d, at - 2, 26, 4); else g.fillRect(at - 2, d, 4, 26);
+      }
+      g.fillStyle = 'rgba(200,205,215,.07)';
+      for (let d = 0; d < len; d += 8) { if (rnd01() < 0.25) continue; if (hor) { g.fillRect(d, at - S * 1.5, 8, 2); g.fillRect(d, at + S * 1.5, 8, 2); } else { g.fillRect(at - S * 1.5, d, 2, 8); g.fillRect(at + S * 1.5, d, 2, 8); } }
+      g.restore();
+    };
+    const ry = (R * (0.2 + rnd01() * 0.2)) * S, rx = (C * (0.62 + rnd01() * 0.2)) * S;
+    road(true, ry); road(false, rx);
+    g.fillStyle = 'rgba(200,205,215,.09)';                            // 路口的斑馬線
+    for (let k = -3; k <= 3; k++) g.fillRect(rx + S * 2, ry + k * 12 - 4, S * 1.2, 7);
+    // 泥土、水窪、油污、屍水
+    for (let k = 0; k < 18; k++) blot(rnd01() * W, rnd01() * H, 40 + rnd01() * 90, 'rgba(70,56,40,.28)', 0.6 + rnd01() * 0.6);
+    for (let k = 0; k < 10; k++) { const x = rnd01() * W, y = rnd01() * H, r = 18 + rnd01() * 36; blot(x, y, r, 'rgba(8,14,30,.65)', 0.55); blot(x - r * 0.2, y - r * 0.1, r * 0.5, 'rgba(120,140,190,.08)', 0.4); }
+    for (let k = 0; k < 14; k++) blot(rnd01() * W, rnd01() * H, 20 + rnd01() * 50, 'rgba(5,6,10,.45)', 0.7);
+    for (let k = 0; k < 6; k++) blot(rnd01() * W, rnd01() * H, 16 + rnd01() * 26, 'rgba(60,80,30,.25)', 0.8);
+    // 柏油顆粒
+    for (let k = 0; k < 14000; k++) { g.fillStyle = rnd01() < 0.5 ? 'rgba(190,195,215,.05)' : 'rgba(0,0,0,.2)'; g.fillRect(rnd01() * W, rnd01() * H, 1.5, 1.5); }
+    // 裂縫：會分岔的折線
+    g.strokeStyle = 'rgba(6,7,12,.6)'; g.lineCap = 'round';
+    const crack = (x, y, a, w, depth) => {
+      g.beginPath(); g.moveTo(x, y); g.lineWidth = w;
+      const n = 5 + rnd01() * 7;
+      for (let j = 0; j < n; j++) {
+        a += (rnd01() - 0.5) * 1.1; x += Math.cos(a) * 12; y += Math.sin(a) * 12; g.lineTo(x, y);
+        if (depth < 2 && rnd01() < 0.18) { g.stroke(); crack(x, y, a + (rnd01() < 0.5 ? 1 : -1) * (0.6 + rnd01()), w * 0.6, depth + 1); g.beginPath(); g.moveTo(x, y); g.lineWidth = w; }
+      }
       g.stroke();
+    };
+    for (let k = 0; k < 40; k++) crack(rnd01() * W, rnd01() * H, rnd01() * 6.28, 1.6 + rnd01() * 1.4, 0);
+    // 人孔蓋
+    for (let k = 0; k < 4; k++) {
+      const x = rnd01() * W, y = rnd01() * H;
+      g.fillStyle = 'rgba(30,32,40,.9)'; g.beginPath(); g.arc(x, y, 11, 0, 6.283); g.fill();
+      g.strokeStyle = 'rgba(110,115,130,.35)'; g.lineWidth = 2; g.stroke();
+      g.beginPath(); for (let d = -6; d <= 6; d += 4) { g.moveTo(x - 8, y + d); g.lineTo(x + 8, y + d); } g.stroke();
     }
-    g.strokeStyle = 'rgba(150,170,235,.09)'; g.lineWidth = 1;   // 格線
-    g.beginPath(); for (let x = 0; x <= C; x++) { g.moveTo(x * S, 0); g.lineTo(x * S, H); } for (let y = 0; y <= R; y++) { g.moveTo(0, y * S); g.lineTo(W, y * S); } g.stroke();
-    g.strokeStyle = 'rgba(150,170,235,.16)'; g.lineWidth = 2;
-    g.beginPath(); for (let x = 0; x <= C; x += 2) { g.moveTo(x * S, 0); g.lineTo(x * S, H); } for (let y = 0; y <= R; y += 2) { g.moveTo(0, y * S); g.lineTo(W, y * S); } g.stroke();
-    // 無線電周圍：畫一圈直升機停機坪記號
-    const [rx, ry] = [RADIO.x * S, RADIO.y * S];
-    g.strokeStyle = 'rgba(230,220,160,.18)'; g.lineWidth = 6; g.beginPath(); g.arc(rx, ry, CFG.EVAC.radius * S * 0.75, 0, 6.283); g.stroke();
-    g.fillStyle = 'rgba(230,220,160,.14)'; g.font = `bold ${S * 1.6}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', rx, ry + S * 1.8);
-    // 接觸陰影：讓廢墟、沙包「站」在地上
+    // 無線電旁：直升機停機坪（救援直升機會降在這裡）
+    const [hx, hy] = [(RADIO.x + 2.5) * S, RADIO.y * S];
+    g.strokeStyle = 'rgba(230,220,160,.22)'; g.lineWidth = 5; g.beginPath(); g.arc(hx, hy, S * 1.9, 0, 6.283); g.stroke();
+    g.fillStyle = 'rgba(230,220,160,.2)'; g.font = `900 ${S * 1.9}px sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('H', hx, hy + 2);
+    // 地形腳邊：灰塵＋接觸陰影
     for (let i = 0; i < N; i++) {
-      if (Grid.rock[i]) blot((ix(i) + 0.5) * S, (iy(i) + 0.5) * S, S * 1.05, 'rgba(5,6,12,.55)');
-      else if (Grid.low[i]) blot((ix(i) + 0.5) * S, (iy(i) + 0.5) * S, S * 0.8, 'rgba(5,6,12,.35)');
+      const x = (ix(i) + 0.5) * S, y = (iy(i) + 0.5) * S;
+      if (Grid.rock[i]) { blot(x, y, S * 1.5, 'rgba(110,112,125,.12)'); blot(x, y, S * 1.05, 'rgba(3,4,8,.6)'); }
+      else if (Grid.low[i]) blot(x, y, S * 0.8, 'rgba(3,4,8,.4)');
     }
     this.floorTex.needsUpdate = true;
   },
   makeRadio() {
-    const g = new THREE.Group(), L = c => new THREE.MeshLambertMaterial({ color: c });
+    const g = new THREE.Group(), L = c => phong({ color: c });
     const base = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 0.9), L(0x45506b)); base.position.y = 0.25; base.castShadow = true; g.add(base);
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 2.4, 6), L(0xb7bccb)); mast.position.set(0.3, 1.5, 0); mast.castShadow = true; g.add(mast);
     this.radioLight = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff4040 })); this.radioLight.position.set(0.3, 2.75, 0); g.add(this.radioLight);
@@ -193,11 +258,14 @@ export const View = {
     const gen = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.45, 0.45), L(0x6b5a3a)); gen.position.set(-0.9, 0.22, 0.3); gen.castShadow = true; g.add(gen);
     const pnl = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.3, 0.05), L(0x2a3040)); pnl.position.set(-0.05, 0.42, 0.46); g.add(pnl);
     this.radioLeds = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.05, 0.02), new THREE.MeshBasicMaterial({ color: 0x6fdc8c })); this.radioLeds.position.set(-0.05, 0.48, 0.49); g.add(this.radioLeds);
+    // 撿到的零件會一個個裝到無線電上（看得到進度）
+    const slots = [[0.3, 0.55, -0.25], [-0.35, 0.5, -0.1], [0, 0.5, 0.15], [-0.4, 0.5, 0.25], [0.35, 0.52, 0.25], [-0.05, 0.5, -0.3]];
+    this.radioParts = slots.map((p, k) => { const m = new THREE.Mesh(partGeo(k), this.zMat); m.position.set(...p); m.scale.setScalar(0.75); m.visible = false; g.add(m); return m; });
     const [x, z] = W2(RADIO.x, RADIO.y); g.position.set(x, 0, z); this.scene.add(g);
-    this.rLight.position.set(x + 0.3, 2.2, z);
+    this.rGlow = this.glowDecal(0xff5040, 7); this.rGlow.position.set(x + 0.3, 0.04, z);
   },
   makeShared() {
-    const L = c => new THREE.MeshLambertMaterial({ color: c });
+    const L = c => phong({ color: c });
     this.G = {
       leg: new THREE.BoxGeometry(0.13, 0.3, 0.13), torso: new THREE.BoxGeometry(0.38, 0.34, 0.24),
       head: new THREE.BoxGeometry(0.36, 0.33, 0.33), hair: new THREE.BoxGeometry(0.38, 0.12, 0.35),
@@ -270,10 +338,11 @@ export const View = {
       this.scene.add(l); this.shots.push({ l, t: 0 });
     }
     const pg = new THREE.Group();
-    const tor = new THREE.Mesh(this.G.torus, this.M.partM); tor.position.y = 0.55; pg.add(tor);
+    const tor = new THREE.Group(); tor.position.y = 0.55; pg.add(tor);
+    const kinds = Array.from({ length: 6 }, (_, k) => { const m = new THREE.Mesh(partGeo(k), this.zMat); m.scale.setScalar(1.6); m.position.y = -0.15; m.visible = false; tor.add(m); return m; });
     const beam = new THREE.Mesh(this.G.beam, this.M.beam); beam.position.y = 6; pg.add(beam);
     const ring = new THREE.Mesh(this.G.ring, new THREE.MeshBasicMaterial({ color: 0x5fe0ff, transparent: true, opacity: 0.6, depthWrite: false })); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; pg.add(ring);
-    pg.visible = false; this.scene.add(pg); this.partMesh = { g: pg, tor, ring };
+    pg.visible = false; this.scene.add(pg); this.partMesh = { g: pg, tor, ring, kinds };
   },
   makeOverlay() {
     this.ovCv = document.createElement('canvas'); this.ovCv.width = C * 8; this.ovCv.height = R * 8;
@@ -350,23 +419,83 @@ export const View = {
     };
     FX.shove = () => { this.P.waveVis = 1; if (Feel.shake) this.shake = Math.max(this.shake, 0.2); };
     FX.broke = () => { if (Feel.shake) this.shake = Math.max(this.shake, 0.18); };
-    FX.pickup = s => { this.burst(s.x, s.y, this.M.gold, 8, 2); UI.msg(`+${s.value} 材料`); };
-    FX.part = (p, n) => { this.burst(p.x, p.y, this.M.partM, 16, 3); if (n < CFG.PARTS.goal) UI.msg(`找到零件 ${n}/${CFG.PARTS.goal}`); if (Feel.slowmo) Game.slowT = 0.35; };
+    FX.pickup = s => { this.burst(s.x, s.y, this.M.gold, 8, 2); UI.msg(Game.materials >= CFG.MAX_MATERIALS ? tr('msg.full') : tr('msg.pickup', { n: s.value })); };
+    FX.part = (p, n) => { this.burst(p.x, p.y, this.M.partM, 16, 3); if (n < CFG.PARTS.goal) UI.msg(tr('msg.part', { part: tr('part.' + ((n - 1) % 6)), n, goal: CFG.PARTS.goal })); if (Feel.slowmo) Game.slowT = 0.35; };
     FX.horde = (dir, warn) => {
       const d = this.dirName(dir);
-      if (warn) UI.alarm(`屍潮要來了，從${d}！`); else UI.alarm(`屍潮從${d}湧來`);
+      UI.alarm(tr(warn ? 'horde.warn' : 'horde.go', { dir: d }));
       UI.hordeDir = dir; UI.hordeFlash = warn ? CFG.HORDE.warn + 4 : 4;
     };
     FX.report = (n, lines) => { UI.showReport(n, lines); this.drawOverlay(); };
     FX.broke = () => { if (Feel.shake) this.shake = Math.max(this.shake, 0.15); };
-    FX.evac = k => { UI.alarm(k === 'start' ? '救援呼叫成功！撐 30 秒，去哪都行' : '直升機降落了！衝回無線電'); if (Feel.shake) this.shake = 0.3; };
+    FX.evac = k => { UI.alarm(tr(k === 'start' ? 'evac.start' : 'evac.pickup')); if (Feel.shake) this.shake = 0.3; };
     FX.msg = m => UI.msg(m);
-    FX.over = win => UI.over(win);
+    // 結束：贏了先看直升機把你載走，輸了停一下再出結算
+    FX.over = win => {
+      if (win) { this.boarded = true; this.heliLeaveT = 0; }
+      clearTimeout(this.overTimer); this.overTimer = setTimeout(() => UI.over(win), win ? 2800 : 900);
+    };
+  },
+  /** 地面發光貼圖（假光源）：加法混合的圓形漸層 */
+  glowDecal(color, size) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+      new THREE.MeshBasicMaterial({ map: this.glowTex, color, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }));
+    m.rotation.x = -Math.PI / 2; m.renderOrder = 2; this.scene.add(m); return m;
+  },
+  /* ---------- 救援直升機：倒數最後 10 秒飛進來、降落等你、你上機後飛走 ---------- */
+  makeHeli() {
+    const geo = heliGeos(), g = new THREE.Group();
+    const body = new THREE.Mesh(geo.body, this.zMat); body.castShadow = true; g.add(body);
+    const rotor = new THREE.Mesh(geo.rotor, this.zMat); rotor.position.y = 1.78; g.add(rotor);
+    const tail = new THREE.Mesh(geo.tail, this.zMat); tail.position.set(0.08, 1.45, -2.7); g.add(tail);
+    g.visible = false; this.scene.add(g);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 1.6, 1, 16, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xe8f4ff, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    beam.visible = false; this.scene.add(beam);
+    const spot = this.glowDecal(0xe8f4ff, 4.5); spot.visible = false;
+    const [hx, hz] = W2(RADIO.x + 2.5, RADIO.y);
+    this.heli = { g, rotor, tail, beam, spot, pad: new THREE.Vector3(hx, 0, hz), from: new THREE.Vector3(hx - 34, 9, hz - 26) };
+  },
+  resetEvac() {
+    this.boarded = false; this.heliLeaveT = undefined; clearTimeout(this.overTimer);
+    this.heli.g.visible = false; this.heli.beam.visible = this.heli.spot.visible = false;
+  },
+  updateHeli(real, t) {
+    const H = this.heli, ev = Game.evac, ease = k => 1 - Math.pow(1 - k, 3);
+    let pos = null, show = true;
+    if (this.boarded) {                                   // 上機了：爬升、往遠處飛走
+      this.heliLeaveT += real;
+      const k = Math.min(1, this.heliLeaveT / 3);
+      pos = H.pad.clone().add(new THREE.Vector3(18 * k * k, 1.2 + 9 * k, -22 * k * k));
+      H.g.rotation.x = -0.25 * Math.min(1, k * 3);
+    } else if (ev === 'pickup') {                         // 降落在停機坪等你
+      H.landT = Math.min(1, (H.landT || 0) + real / 2);
+      pos = H.pad.clone(); pos.y = 4.5 * (1 - ease(H.landT)) + Math.sin(t * 3) * 0.04;
+      H.g.rotation.x = 0;
+    } else if (ev === 'active' && Game.evacT < 10) {      // 從遠處飛進來
+      const k = ease(1 - Game.evacT / 10); H.landT = 0;
+      pos = H.from.clone().lerp(new THREE.Vector3(H.pad.x, 4.5, H.pad.z), k);
+      H.g.rotation.x = 0.18 * (1 - k);
+    } else show = false;
+    H.g.visible = show;
+    H.beam.visible = H.spot.visible = show;
+    if (!show) return;
+    H.g.position.copy(pos);
+    H.g.rotation.y = Math.atan2(H.pad.x - H.from.x, H.pad.z - H.from.z);
+    H.rotor.rotation.y += real * 26; H.tail.rotation.x += real * 30;
+    // 探照燈：從機頭往下的光柱＋地上的光圈
+    H.beam.position.set(pos.x, (pos.y + 0.8) / 2, pos.z); H.beam.scale.set(1, pos.y + 0.8, 1);
+    H.spot.position.set(pos.x, 0.05, pos.z); H.spot.material.opacity = 0.55 + Math.sin(t * 9) * 0.05;
+    if (pos.y < 3 && Math.random() < 0.6) {               // 螺旋槳把地上的灰塵吹起來
+      const a = Math.random() * 6.283, r = 1.5 + Math.random() * 1.5;
+      this.burst(RADIO.x + 2.5 + Math.cos(a) * r, RADIO.y + Math.sin(a) * r, this.M.dust, 1, 0.6);
+    }
+    if (pos.y < 2.5 && Feel.shake) this.shake = Math.max(this.shake, 0.04);
   },
   /** 邏輯方向 → 螢幕上的方位文字（直向時地圖轉了 90°） */
   dirName(a) {
     const k = ((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8;
-    return ['右邊', '右下', '下方', '左下', '左邊', '左上', '上方', '右上'][(k + (this.portrait ? 2 : 0)) % 8];
+    return tr('dir.' + ((k + (this.portrait ? 2 : 0)) % 8));
   },
 
   sync(dt, real) {
@@ -376,7 +505,7 @@ export const View = {
     P.g.position.set(px, P.hop + (Math.hypot(Pd.vx, Pd.vy) > 0.5 ? Math.abs(Math.sin(t * 14)) * 0.05 : 0), pz);
     P.yaw = P.yaw === undefined ? yawOf(Pd.face) : lerpAngle(P.yaw, yawOf(Pd.face), 1 - Math.exp(-(Pd.shoveT > 0 ? 30 : 14) * real));
     P.g.rotation.y = P.yaw;
-    P.g.visible = !(Pd.iframe > 0 && Math.floor(t * 20) % 2 === 0);
+    P.g.visible = !this.boarded && !(Pd.iframe > 0 && Math.floor(t * 20) % 2 === 0);
     const S = CFG.PLAYER, sk = Pd.shoveT > 0 ? 1 - Pd.shoveT / S.shoveTime : 1;
     // 跑步擺手擺腳；推開時雙手往前推；翻越時收腿
     const spd = Math.hypot(Pd.vx, Pd.vy);
@@ -419,7 +548,12 @@ export const View = {
       if (z.stuckMark > 0) o.body.position.x = Math.sin(t * 40) * 0.03; else o.body.position.x = 0;
     }
     this.blobs.count = nb; this.blobs.instanceMatrix.needsUpdate = true;
-    this.pLight.position.set(px, 1.6, pz);
+    this.pLight.position.set(px, 1.4, pz);
+    // 手電筒跟著角色面向（用畫面上的轉向角度，比較順）
+    const fd = Math.PI / 2 - (P.yaw ?? 0), fx = Math.cos(fd), fz = Math.sin(fd);
+    this.flash.position.set(px + fx * 0.25, 1.15 + P.hop, pz + fz * 0.25);
+    this.flash.target.position.set(px + fx * 6, 0, pz + fz * 6);
+    this.flash.intensity = this.boarded ? 0 : 3.2;
     for (let k = this.corpses.length - 1; k >= 0; k--) {
       const c = this.corpses[k], g = c.o.g; c.t += real;
       g.position.y = -c.t * 1.4;
@@ -429,7 +563,7 @@ export const View = {
       const s = Grid.cells[i]; let o = this.sMap.get(i);
       if (o && (!s || o.type !== s.type)) { this.scene.remove(o.g); this.sMap.delete(i); o = null; }
       if (!s) continue;
-      if (!o) { o = this.makeStructure(s.type); const [wx, wz] = W2(ix(i) + 0.5, iy(i) + 0.5); o.g.position.set(wx, 0, wz); o.born = t; this.sMap.set(i, o); }
+      if (!o) { o = this.makeStructure(s.type); const [wx, wz] = W2(ix(i) + 0.5, iy(i) + 0.5); o.g.position.set(wx, 0, wz); if (s.face !== undefined) o.g.rotation.y = yawOf(s.face); o.born = t; this.sMap.set(i, o); }
       const pop = Math.min(1, (t - o.born) / 0.18); o.g.scale.setScalar(0.4 + 0.6 * pop + Math.sin(pop * Math.PI) * 0.15);
       if (o.body) { const k = s.hp / CFG.BUILD.obstacle.hp; o.body.scale.y = 0.45 + 0.55 * k; }
       if (o.ball) {
@@ -459,7 +593,7 @@ export const View = {
     for (const [id, o] of this.scMap) if (!alive.has(id)) { this.scene.remove(o.g); this.scMap.delete(id); }
     // 零件
     const pm = this.partMesh;
-    if (Game.part) { const [wx, wz] = W2(Game.part.x, Game.part.y); pm.g.visible = true; pm.g.position.set(wx, 0, wz); pm.tor.rotation.y = t * 2; pm.tor.rotation.x = Math.sin(t) * 0.4; pm.tor.position.y = 0.55 + Math.sin(t * 3) * 0.08; pm.ring.scale.setScalar(1 + Math.sin(t * 5) * 0.15); }
+    if (Game.part) { const [wx, wz] = W2(Game.part.x, Game.part.y); pm.g.visible = true; pm.g.position.set(wx, 0, wz); pm.tor.rotation.y = t * 1.6; pm.kinds.forEach((m, k) => { m.visible = k === Game.parts % 6; }); pm.tor.position.y = 0.55 + Math.sin(t * 3) * 0.08; pm.ring.scale.setScalar(1 + Math.sin(t * 5) * 0.15); }
     else pm.g.visible = false;
     // 無線電
     const ev = Game.evac;
@@ -468,9 +602,11 @@ export const View = {
     this.radioZone.material.opacity = ev === 'ready' || ev === 'pickup' ? 0.5 + Math.sin(t * 4) * 0.2 : 0;
     this.radioZone.scale.setScalar(ev === 'pickup' ? CFG.EVAC.pickupR / CFG.EVAC.radius : 1);
     this.radioBeam.material.opacity = ev === 'ready' || ev === 'pickup' ? 0.22 : 0.06;
-    this.rLight.color.setHex(ev === 'none' ? 0xff5040 : 0x6fdc8c);
-    this.rLight.intensity = ev === 'none' ? 0.5 + (this.radioLight.visible ? 0.4 : 0) : 0.9 + Math.sin(t * 4) * 0.2;
+    this.rGlow.material.color.setHex(ev === 'none' ? 0xff5040 : 0x6fdc8c);
+    this.rGlow.material.opacity = ev === 'none' ? (this.radioLight.visible ? 0.5 : 0.3) : 0.6 + Math.sin(t * 4) * 0.1;
     this.radioLeds.material.color.setHex(Math.floor(t * 3) % 2 ? 0x6fdc8c : 0x2f6b40);
+    this.radioParts.forEach((m, k) => { m.visible = k < Game.parts; });
+    this.updateHeli(real, t);
 
     for (const p of this.parts) {
       if (p.t <= 0) continue;
@@ -481,14 +617,20 @@ export const View = {
     for (const s of this.shots) { if (s.t > 0) s.t -= real; s.l.material.opacity = Math.max(0, s.t / 0.08); }
     this.ov.visible = UI.mem;
 
-    // 鏡頭與陰影跟隨
+    // 鏡頭與陰影跟隨：角色在畫面正中央（只有靠近地圖邊緣時鏡頭才停住）
     const ext = this.portrait ? [R / 2 - 5, C / 2 - 6] : [C / 2 - 8.5, R / 2 - 4.5];
     let tx, tz;
-    if (this.portrait) { tx = clamp(px, -ext[1], ext[1]) + 1.6; tz = clamp(pz, -ext[0], ext[0]); }
-    else { tx = clamp(px, -ext[0], ext[0]); tz = clamp(pz, -ext[1], ext[1]) + 1.4; }
+    if (this.portrait) { tx = clamp(px, -ext[1], ext[1]); tz = clamp(pz, -ext[0], ext[0]); }
+    else { tx = clamp(px, -ext[0], ext[0]); tz = clamp(pz, -ext[1], ext[1]); }
     const kc = Math.min(1, real * 6);
     this.camLook.x += (tx - this.camLook.x) * kc; this.camLook.z += (tz - this.camLook.z) * kc;
-    this.cam.position.copy(this.camDir).multiplyScalar(this.camDist).add(this.camLook);
+    if (Game.phase === 'title') {
+      // 標題畫面：鏡頭慢慢繞著無線電轉，角色在畫面右半邊（左半邊留給 Logo）
+      this.orbit = (this.orbit || 0) + real * 0.06;
+      const [rx, rz] = W2(RADIO.x, RADIO.y), d = 12;
+      this.camLook.set(rx - 3.2 * Math.cos(this.orbit), 0, rz + 3.2 * Math.sin(this.orbit) * 0.3);
+      this.cam.position.set(rx + Math.sin(this.orbit) * d, 7.5, rz + Math.cos(this.orbit) * d);
+    } else this.cam.position.copy(this.camDir).multiplyScalar(this.camDist).add(this.camLook);
     if (this.shake > 0) {
       const s = this.shake * this.shake;
       this.cam.position.x += (Math.random() - 0.5) * s * 1.6; this.cam.position.y += (Math.random() - 0.5) * s; this.cam.position.z += (Math.random() - 0.5) * s * 1.6;
