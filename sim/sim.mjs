@@ -3,12 +3,14 @@
  *   npm run sim                  → 跑 30 局「會用道具」的模擬玩家
  *   npm run sim -- --runs 100    → 指定局數
  *   npm run sim -- --nobuild     → 完全不用道具（對照組：道具有沒有價值）
+ *   npm run sim -- --cfg tune.json → 套用參數面板「複製修改」的 JSON 再跑
  *
  * 模擬玩家很笨：只會衝向最近的目標、被追時挑離殭屍遠的方向、在殭屍從背後追來時往前放障礙。
  * 它不會利用廢墟擋視線，也不會刻意把誘餌丟到有用的位置，所以勝率只能當「相對比較」用，
  * 不能直接當成真人的難度。改完數值後，看的是「改之前 vs 改之後」的差異。 */
 import { pathToFileURL } from 'node:url';
-import { CFG, RADIO, TYPES } from '../src/config.js';
+import { CFG, RADIO, TYPES, applyCfg } from '../src/config.js';
+import { readFileSync } from 'node:fs';
 import { Grid } from '../src/grid.js';
 import { Memory } from '../src/memory.js';
 import { Game, gameTimers } from '../src/game.js';
@@ -19,6 +21,9 @@ const args = process.argv.slice(2);
 const opt = (name, def) => { const i = args.indexOf('--' + name); return i < 0 ? def : (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true); };
 const RUNS = +opt('runs', 30), MAX_T = 900, DT = 0.033;
 let NOBUILD = !!opt('nobuild', false);
+// --cfg 檔案.json：套用參數面板「複製修改」出來的 JSON，直接拿調過的數值跑模擬
+const CFG_FILE = opt('cfg', null);
+if (CFG_FILE) { applyCfg(JSON.parse(readFileSync(CFG_FILE, 'utf8'))); console.log('套用參數：', CFG_FILE); }
 
 export const agg = { dmg: {}, spawned: {}, evolutions: 0, stuck: 0, vaults: 0, snared: 0, baited: 0, dodged: 0, shares: [] };
 const hurt0 = Game.hurtPlayer.bind(Game);
