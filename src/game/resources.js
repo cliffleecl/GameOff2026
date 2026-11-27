@@ -1,7 +1,6 @@
 /* 材料箱、零件的生成與撿取。 */
 import { CFG, C, R, N, idx, ix, iy, inB, clamp, rnd, cellOf, DIR4, DIR8, RADIO, TYPES } from '../config.js';
 import { Feel, FX, Input } from '../fx.js';
-import { t } from '../i18n.js';
 import { Grid } from '../grid.js';
 import { resolve, clearLine, sight, lineHasTrap, lookAhead, steer, hash01 } from '../physics.js';
 import { Memory, knowsTrap } from '../memory.js';
@@ -52,7 +51,7 @@ Object.assign(Game, {
     for (let k = this.scraps.length - 1; k >= 0; k--) {
       const s = this.scraps[k];
       if (Math.hypot(s.x - P.x, s.y - P.y) > S.pickR) continue;
-      this.materials = Math.min(CFG.MAX_MATERIALS, this.materials + s.value); this.period.picks++; this.stats.scraps++;
+      this.materials += s.value; this.period.picks++;
       Memory.wPick[cellOf(s.x, s.y)] += 1;
       this.scraps.splice(k, 1);
       FX.pickup(s);
@@ -62,7 +61,7 @@ Object.assign(Game, {
       Memory.wPick[cellOf(this.part.x, this.part.y)] += 2; this.period.parts++;
       const p = this.part; this.part = null; this.parts++;
       FX.part(p, this.parts);
-      if (this.parts >= CFG.PARTS.goal) { this.evac = 'ready'; FX.msg(t('msg.partsDone')); }
+      if (this.parts >= CFG.PARTS.goal) { this.evac = 'ready'; FX.msg('無線電零件齊了！回到中央的無線電呼叫救援'); }
       else this.partT = CFG.PARTS.delay;
     }
     if (!this.part && this.evac === 'none') { this.partT -= dt; if (this.partT <= 0) this.spawnPart(); }

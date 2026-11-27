@@ -1,7 +1,6 @@
 /* 殭屍 AI：路徑成本、預判、誘餌、各類型的移動與互動。 */
 import { CFG, C, R, N, idx, ix, iy, inB, clamp, rnd, cellOf, DIR4, DIR8, RADIO, TYPES } from '../config.js';
 import { Feel, FX, Input } from '../fx.js';
-import { t } from '../i18n.js';
 import { Grid } from '../grid.js';
 import { resolve, clearLine, sight, lineHasTrap, lookAhead, steer, hash01 } from '../physics.js';
 import { Memory, knowsTrap } from '../memory.js';
@@ -201,7 +200,7 @@ Object.assign(Game, {
     if (s.type === 'trap') {
       const T = CFG.BUILD.trap;
       z.stun = Math.max(z.stun, T.stun); z.slow = T.slowTime; z.flash = 0.15; this.period.snared++;
-      if (--s.uses <= 0) { Grid.remove(c); FX.msg(t('msg.trapBroke')); }
+      if (--s.uses <= 0) { Grid.remove(c); FX.msg('陷阱壞掉了'); }
     } else if (s.type === 'bait' && z.baitSeen[c] !== 2) this.eatBait(z, c);
   },
   eatBait(z, c) {
@@ -215,7 +214,7 @@ Object.assign(Game, {
   destroyStructure(i) {
     const s = Grid.cells[i]; if (!s) return;
     Grid.remove(i);
-    FX.broke(i, s.type); FX.msg(t('msg.broke', { item: t('item.' + s.type) }));
+    FX.broke(i, s.type); FX.msg(`${CFG.BUILD[s.type].name}被拆掉了`);
     for (const z of this.zombies) z.repath = 0;
   },
   despawn(z) { z.dead = true; const i = this.zombies.indexOf(z); if (i >= 0) this.zombies.splice(i, 1); FX.despawn(z); },

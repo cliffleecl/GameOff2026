@@ -1,7 +1,6 @@
 /* 放置道具：障礙放前方、陷阱放腳下、誘餌往前丟。 */
 import { CFG, C, R, N, idx, ix, iy, inB, clamp, rnd, cellOf, DIR4, DIR8, RADIO, TYPES } from '../config.js';
 import { Feel, FX, Input } from '../fx.js';
-import { t } from '../i18n.js';
 import { Grid } from '../grid.js';
 import { resolve, clearLine, sight, lineHasTrap, lookAhead, steer, hash01 } from '../physics.js';
 import { Memory, knowsTrap } from '../memory.js';
@@ -10,7 +9,7 @@ import { Game, gameTimers, setTimeoutGame, tickGameTimers } from './core.js';
 
 Object.assign(Game, {
   /* ---------- 放置（丟在身後） ---------- */
-  costOf() { return CFG.ITEM_COST; },
+  costOf(type) { return CFG.BUILD[type].cost; },
   throwTarget() {
     const P = this.player, B = CFG.BUILD.bait, cx = Math.cos(P.face), cy = Math.sin(P.face);
     for (let d = B.throw; d >= 1; d -= 0.5) {
@@ -24,7 +23,7 @@ Object.assign(Game, {
   drop(type) {
     if (this.phase !== 'play') return false;
     const d = CFG.BUILD[type], P = this.player, cost = this.costOf(type);
-    if (this.materials < cost) { FX.msg(t('msg.noMat')); return false; }
+    if (this.materials < cost) { FX.msg(`材料不夠：${d.name}要 ${cost} 個`); return false; }
     const pc = cellOf(P.x, P.y), px = ix(pc), py = iy(pc);
     // 位置固定：障礙放「正前方」（衝過去翻越、落地加速，追兵被擋在後面）；陷阱、誘餌放「腳下」
     const k0 = ((Math.round(P.face / (Math.PI / 4)) % 8) + 8) % 8 + (type === 'obstacle' ? 0 : 4);
@@ -34,10 +33,10 @@ Object.assign(Game, {
     // 陷阱、誘餌放在你腳下（你踩不會觸發）；腳下已經有東西才改放正後方
     // 誘餌：往前方丟出去（高的廢墟會擋住，矮牆、障礙丟得過去）
     if (type === 'bait') {
-      const tc = this.throwTarget();
-      if (tc < 0) { FX.msg(t('msg.noThrow')); return false; }
-      Grid.place(tc, 'bait'); const b = Grid.cells[tc]; b.from = { x: P.x, y: P.y }; b.t0 = this.time;
-      this.materials -= cost; this.stats.items++;
+      const t = this.throwTarget();
+      if (t < 0) { FX.msg('前面沒有地方丟'); return false; }
+      Grid.place(t, 'bait'); const b = Grid.cells[t]; b.from = { x: P.x, y: P.y }; b.t0 = this.time;
+      this.materials -= cost;
       for (const z of this.zombies) z.repath = 0;
       return true;
     }
@@ -52,9 +51,9 @@ Object.assign(Game, {
       }
       if (c0 >= 0) break;
     }
-    if (c0 < 0) { FX.msg(t('msg.noSpace')); return false; }
+    if (c0 < 0) { FX.msg('那個方向沒有空位'); return false; }
     const placed = [c0];
-    Grid.place(c0, type); this.materials -= cost; this.stats.items++;
+    Grid.place(c0, type); this.materials -= cost;
     if (type === 'obstacle') this.period.placed++;
     // 障礙一次放一道 3 格寬的路障，橫在你前方
     if (type === 'obstacle') {
@@ -64,8 +63,6 @@ Object.assign(Game, {
         if (this.scraps.some(s => cellOf(s.x, s.y) === idx(x, y)) || (this.part && cellOf(this.part.x, this.part.y) === idx(x, y))) continue;
         Grid.place(idx(x, y), type); placed.push(idx(x, y));
       }
-      // 記錄放置方向：畫面上路障要轉成橫擋在你前方
-      for (const c of placed) Grid.cells[c].face = Math.atan2(uy, ux);
       // 放下的障礙跟殭屍重疊 → 撞到牠：往外彈開並暈眩一下
       const O = CFG.BUILD.obstacle;
       let bumped = 0;
@@ -81,7 +78,7 @@ Object.assign(Game, {
         }
       }
       if (bumped && Feel.hitstop) this.hitstop = Math.max(this.hitstop, 0.05);
-      if (bumped) FX.msg(bumped > 1 ? t('msg.bumpN', { n: bumped }) : t('msg.bump1'));
+      if (bumped) FX.msg(bumped > 1 ? `障礙撞暈了 ${bumped} 隻殭屍` : '障礙撞暈了殭屍');
     }
     for (const z of this.zombies) { z.repath = 0; resolve(z); }
     return true;

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
@@ -10,14 +10,14 @@
   <canvas id="cv"></canvas>
   <div id="fog"></div>
   <div id="flash"></div>
-  <!-- 跟著角色的血條＋材料條（材料一格＝一個道具） -->
-  <div id="pbar"><div class="hp"><div id="pfill"></div></div><div class="mat"><div id="mfill"></div><div id="mseg"></div></div></div>
+  <div id="pbar"><div id="pfill"></div></div>
 
-  <!-- 遊戲中 HUD：零件、時間、屍腦，置中、只用圖示 -->
   <header id="hud">
-    <div class="pill" id="sParts"></div>
-    <div class="pill" id="sTime"><i class="ico" data-icon="clock"></i><b id="vTime">0:00</b></div>
-    <div class="pill" id="brainStat"><i class="ico" data-icon="brain"></i><div id="brainBar"><div id="brainFill"></div></div></div>
+    <h1>Brain Shift</h1>
+    <div class="stat" id="sParts"><small>零件</small><b id="vParts">0/6</b></div>
+    <div class="stat"><small>材料</small><b id="vMat">0</b></div>
+    <div class="stat"><small>時間</small><b id="vTime">0:00</b></div>
+    <div class="stat" id="brainStat" title="累積夠多學習事件就會進化"><small>屍腦</small><div id="brainBar"><div id="brainFill"></div></div></div>
   </header>
   <div id="ticker" class="fade"></div>
   <div id="report" class="hide"><h2 id="rTitle"></h2><ul id="rBody"></ul></div>
@@ -28,59 +28,33 @@
 
   <footer id="bar">
     <div class="row builds" id="builds">
-      <button class="bld" data-b="obstacle"><i class="ico" data-icon="obstacle"></i><span data-i18n="item.obstacle"></span><kbd>1</kbd></button>
-      <button class="bld" data-b="trap"><i class="ico" data-icon="trap"></i><span data-i18n="item.trap"></span><kbd>2</kbd></button>
-      <button class="bld" data-b="bait"><i class="ico" data-icon="bait"></i><span data-i18n="item.bait"></span><kbd>3</kbd></button>
+      <button class="bld" data-b="obstacle"><i class="i-obstacle"></i>障礙<small>8 材料</small></button>
+      <button class="bld" data-b="trap"><i class="i-trap"></i>陷阱<small>10 材料</small></button>
+      <button class="bld" data-b="bait"><i class="i-bait"></i>誘餌<small>10 材料</small></button>
+    </div>
+    <div class="row opts">
+      <button class="opt" id="btnSpeed">速度 1x</button>
+      <button class="opt" id="btnMem">記憶</button>
+      <button class="opt" id="btnReset">重置</button>
     </div>
   </footer>
 
   <div id="stick"><div id="knob"></div></div>
-  <div id="rotate"><div><span class="ph">📱</span><br><span data-i18n="rotate"></span></div></div>
-
-  <!-- 標題畫面：全螢幕，背景是即時的 3D 場景 -->
-  <section id="title" class="screen">
-    <div class="tbg"></div>
-    <div class="tmain">
-      <div class="logo" aria-label="Brain Shift">
-        <span class="l1" data-text="BRAIN">BRAIN</span>
-        <span class="l2" data-text="SHIFT">SHIFT</span>
-      </div>
-      <p class="tag" data-i18n="title.tag"></p>
-      <nav class="tmenu">
-        <button id="btnStart" class="primary" data-i18n="btn.start"></button>
-        <button id="btnHow" data-i18n="btn.howto"></button>
-        <button id="btnLang"></button>
-      </nav>
+  <div id="rotate"><div><span class="ph">📱</span><br>請把手機轉成橫向來玩</div></div>
+  <div id="overlay"><div id="ocard">
+    <h1 id="oTitle">Brain Shift</h1>
+    <div class="tag" id="oTag">你會翻牆，牠們會學。</div>
+    <div id="oBody">
+      <p><b>你是跑酷專家。</b>殭屍殺不死，只能甩掉。矮牆和你放的障礙你都翻得過去，落地後會短暫加速；大部分殭屍翻不過。</p>
+      <p><b>放的位置固定：</b>障礙放在你正前方（衝過去翻、甩開追兵），陷阱放在你腳下（你踩不會觸發，留給追兵）；誘餌是一塊肉，往前丟約 5 格，把附近的殭屍引過去。</p>
+      <p><b>撿材料才能蓋東西。</b>金色箱子是材料，用來做障礙、陷阱、誘餌；越遠的箱子材料越多。</p>
+      <p><b>集滿 6 個零件。</b>藍色光柱是無線電零件。集滿後回中央的無線電呼叫救援，撐 30 秒，再衝回無線電上直升機。</p>
+      <p><b>屍群會進化。</b>一開始多是紅色盲衝殭屍，會直線衝、會卡在障礙後。你用障礙，紫色拆除殭屍變多；你靠翻越甩掉牠們，青色跑酷殭屍變多；你用陷阱、誘餌、躲廢墟，黃色繞路殭屍變多。</p>
+      <p>你沒辦法打殭屍，被碰到就會受傷，只能靠跑、翻越和道具甩掉牠們。</p>
+      <p><b>手機：</b>轉成橫向，左手按住左半邊畫面是虛擬搖桿，右手按道具。<b>電腦：</b>WASD 或滑鼠點地面移動，1–3 丟設施，F 加速，H 記憶。</p>
     </div>
-    <div class="tfoot">GitHub Game Off 2026 · Theme: Shift</div>
-  </section>
-
-  <section id="howto" class="screen hide">
-    <div class="card">
-      <h2 data-i18n="how.title"></h2>
-      <p data-i18n-html="how.goal"></p>
-      <p data-i18n-html="how.run"></p>
-      <p data-i18n-html="how.items"></p>
-      <p data-i18n-html="how.evo"></p>
-      <p class="zlist" data-i18n-html="how.zombies"></p>
-      <p class="ctrl" data-i18n-html="how.ctrl"></p>
-      <button id="btnHowBack" class="primary" data-i18n="btn.back"></button>
-    </div>
-  </section>
-
-  <!-- 結算：大數字 -->
-  <section id="result" class="screen hide">
-    <div class="rcard">
-      <h1 id="resTitle"></h1>
-      <p id="resTag"></p>
-      <div class="stats" id="resStats"></div>
-      <div class="comp"><small data-i18n="res.comp"></small><div id="resComp"></div><div id="resLegend"></div></div>
-      <div class="rbtns">
-        <button id="btnAgain" class="primary" data-i18n="btn.again"></button>
-        <button id="btnMenu" data-i18n="btn.menu"></button>
-      </div>
-    </div>
-  </section>
+    <button id="obtn">開始</button>
+  </div></div>
 </div>
 <script type="module" src="./src/main.js"></script>
 </body>
