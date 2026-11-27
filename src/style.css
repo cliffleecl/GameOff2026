@@ -1,74 +1,72 @@
   :root{
-    --ink:#ece6d8; --dim:#a3a8bb; --panel:rgba(14,16,26,.78); --line:rgba(255,255,255,.1);
-    --brain:#ef8fab; --go:#e9773b; --hp:#6fdc8c; --bad:#ff6b5e; --gold:#f2cb52; --part:#5fe0ff; --shift:#34d1c0;
-    --font:"Segoe UI","PingFang TC","PingFang SC","Noto Sans TC","Noto Sans SC","Microsoft JhengHei","Microsoft YaHei",system-ui,sans-serif;
+    --ink:#ece6d8; --dim:#a3a8bb; --panel:rgba(18,21,33,.84); --line:rgba(255,255,255,.08);
+    --brain:#ef8fab; --go:#e9773b; --hp:#6fdc8c; --bad:#ff6b5e; --gold:#f2cb52; --part:#5fe0ff;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:#0e1018}
-  body{color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.4;
+  html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:#1b1f2e}
+  body{color:var(--ink);font-family:"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;font-size:14px;line-height:1.4;
        -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
   #app{position:fixed;inset:0}
   #cv{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
-  #fog{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 75% 70% at 50% 50%,transparent 55%,rgba(8,10,18,.45) 85%,rgba(4,5,10,.8) 100%)}
+  #fog{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 80% 75% at 50% 52%,transparent 60%,rgba(22,26,40,.35) 86%,rgba(12,14,24,.7) 100%)}
   #flash{position:absolute;inset:0;pointer-events:none;opacity:0;box-shadow:inset 0 0 120px 30px rgba(255,40,40,.85)}
-  .ico{display:inline-block;width:20px;height:20px;flex:none}
-  .ico svg,.slot svg{width:100%;height:100%;display:block}
 
-  /* ---------- HUD：零件、時間、屍腦，置中、大小一樣、只用圖示 ---------- */
-  #hud{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 0;display:flex;gap:8px;justify-content:center;pointer-events:none}
-  .pill{background:var(--panel);border:1px solid var(--line);border-radius:999px;height:38px;width:150px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 12px}
-  #sParts{gap:4px}
-  .slot{width:18px;height:18px;color:rgba(160,170,200,.35);transition:color .3s, transform .3s}
-  .slot.on{color:var(--part);filter:drop-shadow(0 0 4px rgba(95,224,255,.8));transform:scale(1.1)}
-  #sTime .ico{color:var(--dim)} #vTime{font-size:17px;font-variant-numeric:tabular-nums;min-width:44px;text-align:left}
-  #brainStat .ico{color:var(--brain)}
-  #brainBar{height:8px;border-radius:4px;background:#3a2836;overflow:hidden;flex:1}
+  #hud{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 10px 8px;display:flex;gap:6px;align-items:center;pointer-events:none}
+  #hud h1{margin:0 6px 0 0;font-size:16px;font-weight:800;color:var(--brain);white-space:nowrap;text-shadow:0 1px 3px #000}
+  .stat{background:var(--panel);border-radius:8px;padding:3px 9px;text-align:center;min-width:54px}
+  .stat small{display:block;font-size:10px;color:var(--dim)}
+  .stat b{font-size:15px;font-variant-numeric:tabular-nums}
+  #sParts b{color:var(--part)}
+  #brainStat{min-width:56px}
+  #brainBar{height:7px;border-radius:4px;background:#3a2836;overflow:hidden;margin-top:5px}
   #brainFill{height:100%;width:0;background:var(--brain);transition:width .3s}
-  #brainStat.full #brainFill{animation:pulse .6s ease-in-out infinite alternate}
-  @keyframes pulse{from{opacity:.55}to{opacity:1}}
-
-  /* ---------- 跟著角色：血條＋材料條（材料一格＝一個道具） ---------- */
-  #pbar{position:absolute;left:0;top:0;width:52px;margin:-3px 0 0 -26px;pointer-events:none;display:none}
-  #pbar .hp,#pbar .mat{height:6px;border-radius:3px;background:rgba(0,0,0,.65);box-shadow:0 0 0 1px rgba(0,0,0,.4);overflow:hidden;position:relative}
-  #pbar .mat{height:5px;margin-top:2px}
+  #brainStat.full #brainFill{animation:brainPulse .6s ease-in-out infinite alternate}
+  @keyframes brainPulse{from{opacity:.55}to{opacity:1}}
+  #hpStat{flex:1;max-width:220px;text-align:left}
+  /* 玩家血條：跟著角色，顯示在腳下；滿血時淡一點，低血變紅 */
+  #pbar{position:absolute;left:0;top:0;width:46px;height:6px;margin:-3px 0 0 -23px;border-radius:3px;background:rgba(0,0,0,.6);box-shadow:0 0 0 1px rgba(0,0,0,.35);overflow:hidden;pointer-events:none;transition:opacity .3s;display:none}
   #pfill{height:100%;width:100%;background:var(--hp);transition:width .2s}
-  #mfill{height:100%;width:0;background:var(--gold);transition:width .2s}
-  #mseg{position:absolute;inset:0;display:flex;justify-content:space-evenly}
-  #mseg i{width:1px;background:rgba(0,0,0,.7)}
-  #pbar.low #pfill{background:var(--bad);animation:pulse .5s ease-in-out infinite alternate}
-
-  #ticker{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 54px);
+  #pbar.full{opacity:.4}
+  #pbar.low #pfill{background:var(--bad);animation:brainPulse .5s ease-in-out infinite alternate}
+  #hpBar{height:7px;border-radius:4px;background:#3a2328;overflow:hidden;margin-top:3px}
+  #hpFill{height:100%;width:100%;background:var(--hp);transition:width .2s}
+  #hpStat.low #hpFill{background:var(--bad)}
+  #ticker{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 58px);
           background:var(--panel);padding:5px 12px;border-radius:14px;font-size:13px;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;pointer-events:none;transition:opacity .4s}
   #ticker.fade{opacity:0}
   #ticker.alarm{background:rgba(120,20,20,.9);color:#fff;font-weight:700}
 
-  #report{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 54px);width:min(290px,64vw);font-size:12px;line-height:1.35;padding:7px 10px 6px;
-          background:var(--panel);border-left:4px solid var(--brain);border-radius:10px;pointer-events:none;transition:opacity .5s, transform .5s}
+  #report{position:absolute;left:10px;top:calc(env(safe-area-inset-top,0px) + 92px);width:min(270px,64vw);font-size:12px;line-height:1.35;padding:7px 10px 6px !important;
+          background:var(--panel);border-left:4px solid var(--brain);border-radius:10px;padding:10px 14px 8px;pointer-events:none;transition:opacity .5s, transform .5s}
   #report.hide{opacity:0;transform:translate(-50%,-10px)}
   #report h2{margin:0 0 3px;font-size:13px;color:var(--brain)}
   #report ul{margin:0;padding-left:0;list-style:none}
   #report li{margin:2px 0}
   #report li.comp{margin:0 0 4px;color:var(--gold);font-size:11px;font-variant-numeric:tabular-nums}
 
-  #minimap{position:absolute;right:10px;top:calc(env(safe-area-inset-top,0px) + 8px);border-radius:8px;background:rgba(10,12,20,.75);border:1px solid var(--line);pointer-events:none}
+  #minimap{position:absolute;right:10px;bottom:calc(env(safe-area-inset-bottom,0px) + 128px);border-radius:8px;background:rgba(10,12,20,.75);border:1px solid var(--line);pointer-events:none}
   .arrow{position:absolute;left:0;top:0;width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-bottom:22px solid var(--part);
          filter:drop-shadow(0 0 4px rgba(0,0,0,.8));pointer-events:none;display:none}
   .arrow.radio{border-bottom-color:var(--hp)}
-  #evac{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 88px);background:rgba(20,60,35,.9);
+  #evac{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 92px);background:rgba(20,60,35,.9);
         border-radius:12px;padding:8px 16px;font-weight:800;font-size:16px;display:none;pointer-events:none;text-align:center}
   #evac small{display:block;font-weight:400;font-size:12px;color:#cfe9d6}
   #evac.out{background:rgba(110,40,20,.9)}
 
-  /* ---------- 道具按鈕：只顯示圖示＋名稱（價格都一樣，材料看角色腳下的材料條） ---------- */
-  #bar{position:absolute;left:0;right:0;bottom:0;padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 12px);display:flex;justify-content:center;pointer-events:none}
-  .row{display:flex;gap:8px;pointer-events:auto}
-  button{font:inherit;color:var(--ink);background:var(--panel);border:2px solid var(--line);border-radius:12px;min-height:48px;padding:4px 10px;cursor:pointer;touch-action:manipulation}
+  #bar{position:absolute;left:0;right:0;bottom:0;padding:8px 8px calc(env(safe-area-inset-bottom,0px) + 8px);display:flex;flex-direction:column;gap:6px;pointer-events:none}
+  .row{display:flex;gap:6px;pointer-events:auto}
+  button{font:inherit;color:var(--ink);background:var(--panel);border:2px solid var(--line);border-radius:12px;min-height:52px;padding:4px 6px;cursor:pointer;touch-action:manipulation}
   button:focus-visible{outline:2px solid var(--brain);outline-offset:2px}
-  .bld{width:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:13px;font-weight:700;position:relative;padding:6px 4px}
-  .bld .ico{width:24px;height:24px;color:var(--gold)}
-  .bld kbd{position:absolute;top:3px;right:6px;font:600 10px var(--font);color:var(--dim)}
-  .bld.poor{opacity:.4}
+  .bld{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:700}
+  .bld small{font-weight:400;color:var(--gold);font-size:12px}
+  .bld i{width:16px;height:16px;display:block}
+  .bld.poor{opacity:.45} .bld.poor small{color:var(--bad)}
   .bld:active{transform:scale(.95)}
+  .i-obstacle{background:repeating-linear-gradient(45deg,#e9a23b 0 4px,#3a3f52 4px 8px);border-radius:2px;height:10px !important;margin-top:6px}
+  .i-trap{background:#a8713f;border-radius:2px}.i-bait{background:radial-gradient(circle at 38% 38%,#d8735a,#8a2e22);border-radius:55% 45% 50% 50%;box-shadow:5px 4px 0 -3px #f3ead8}
+  .opt{flex:1;min-height:40px;font-size:13px;border-radius:10px}
+  .opt.on{border-color:var(--brain);color:var(--brain)}
+  #btnReset.arm{background:var(--bad);color:#fff}
 
   /* ---------- 手機（觸控）：橫向＋左手虛擬搖桿、右手道具 ---------- */
   #stick{position:absolute;left:0;top:0;width:124px;height:124px;margin:-62px 0 0 -62px;border-radius:50%;display:none;pointer-events:none;
@@ -82,81 +80,35 @@
   body.touch #bar{inset:0;padding:0;display:block}
   body.touch .row.builds{position:absolute;right:calc(env(safe-area-inset-right,0px) + 16px);bottom:calc(env(safe-area-inset-bottom,0px) + 14px);
                          display:grid;grid-template-columns:72px 72px;grid-template-areas:". trap" "obstacle bait";gap:10px;width:auto}
-  body.touch .bld{width:72px;height:72px;min-height:0;border-radius:50%;font-size:11px;padding:0;background:rgba(14,16,26,.72)}
-  body.touch .bld kbd{display:none}
+  body.touch .bld{width:72px;height:72px;min-height:0;border-radius:50%;font-size:12px;padding:0;background:rgba(18,21,33,.72);border-width:2px}
   body.touch .bld[data-b="obstacle"]{grid-area:obstacle} body.touch .bld[data-b="trap"]{grid-area:trap} body.touch .bld[data-b="bait"]{grid-area:bait}
+  body.touch .bld small{font-size:10px}
+  body.touch .row.opts{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 10px);width:auto;gap:8px}
+  body.touch .opt{min-height:34px;padding:2px 12px;font-size:12px;flex:none}
+  body.touch #minimap{top:calc(env(safe-area-inset-top,0px) + 58px);bottom:auto;right:calc(env(safe-area-inset-right,0px) + 10px)}
   body.touch #hud{padding-left:calc(env(safe-area-inset-left,0px) + 10px);padding-right:calc(env(safe-area-inset-right,0px) + 10px)}
-  body.touch .pill{width:132px;height:34px}
-  body.touch #minimap{right:calc(env(safe-area-inset-right,0px) + 10px)}
   body.touch #report{left:calc(env(safe-area-inset-left,0px) + 10px)}
   @media (orientation:portrait){ body.touch #rotate{display:flex} }
-  @media (max-width:640px){ .pill{width:118px;gap:5px;padding:0 8px} .slot{width:15px;height:15px} #sParts{gap:2px} }
+  #overlay{position:absolute;inset:0;background:rgba(12,14,22,.72);display:flex;align-items:center;justify-content:center;padding:18px;pointer-events:auto}
+  #overlay.hide{display:none}
+  #ocard{background:#1e2233;border-radius:14px;padding:22px 22px 18px;max-width:430px;width:100%;border-top:4px solid var(--brain);max-height:90vh;overflow-y:auto}
+  #ocard.win{border-top-color:var(--hp)} #ocard.lose{border-top-color:var(--bad)}
+  #ocard h1{margin:0;font-size:30px;font-weight:900}
+  #ocard .tag{margin:4px 0 14px;color:var(--brain);font-size:15px}
+  #ocard p{margin:6px 0;color:var(--dim);font-size:13px}
+  #ocard p b{color:var(--ink);font-weight:600}
+  #obtn{width:100%;margin-top:14px;background:var(--go);color:#1d1107;border:0;font-weight:900;font-size:17px}
 
-  /* 選單開著時：藏起遊戲中的介面 */
-  body.menu #hud, body.menu #bar, body.menu #stick, body.menu #minimap, body.menu #ticker, body.menu #report, body.menu #pbar{display:none !important}
-
-  /* ---------- 全螢幕畫面共用 ---------- */
-  .screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:auto;z-index:10}
-  .screen.hide{display:none}
-  .tmenu button,.rbtns button,#btnHowBack{min-height:50px;font-size:17px;font-weight:700;border-radius:12px;padding:0 22px;background:rgba(14,16,26,.7);border-color:rgba(255,255,255,.16);backdrop-filter:blur(4px)}
-  .tmenu button:hover,.rbtns button:hover{border-color:var(--shift)}
-  button.primary{background:var(--go);color:#1d1107;border-color:transparent}
-  button.primary:hover{border-color:#fff}
-
-  /* ---------- 標題畫面：背景是即時 3D 場景（鏡頭繞著無線電轉） ---------- */
-  #title{justify-content:flex-start}
-  #title .tbg{position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,7,14,.92) 0%,rgba(6,7,14,.7) 38%,rgba(6,7,14,.1) 75%),radial-gradient(ellipse at 70% 60%,transparent 30%,rgba(6,7,14,.6) 100%)}
-  #title .tmain{position:relative;padding:0 0 0 clamp(24px,8vw,110px);display:flex;flex-direction:column;align-items:flex-start;gap:clamp(8px,2.4vh,18px)}
-  .logo{display:flex;flex-direction:column;line-height:.86;font-weight:900;font-style:italic;letter-spacing:.02em;font-size:clamp(52px,11vw,132px);text-transform:uppercase}
-  .logo span{position:relative;display:block;color:#f4efe2}
-  .logo .l2{margin-left:.55em;color:var(--brain)}
-  /* 「Shift」：兩層錯位的殘影，像畫面被推了一下 */
-  .logo span::before,.logo span::after{content:attr(data-text);position:absolute;left:0;top:0;opacity:.55;pointer-events:none}
-  .logo span::before{color:var(--shift);transform:translate(-.05em,.02em);clip-path:inset(0 0 72% 0);animation:shiftA 3.2s steps(1) infinite}
-  .logo span::after{color:#ff5a4e;transform:translate(.05em,-.02em);clip-path:inset(76% 0 0 0);animation:shiftB 3.2s steps(1) infinite}
-  @keyframes shiftA{0%,86%{transform:translate(-.025em,.012em)}88%{transform:translate(-.14em,0)}92%{transform:translate(.06em,.03em)}96%{transform:translate(-.025em,.012em)}}
-  @keyframes shiftB{0%,86%{transform:translate(.025em,-.012em)}89%{transform:translate(.16em,0)}93%{transform:translate(-.05em,-.03em)}97%{transform:translate(.025em,-.012em)}}
-  #title .tag{margin:0;font-size:clamp(15px,2.2vw,22px);color:var(--ink);opacity:.85;letter-spacing:.04em}
-  .tmenu{display:flex;flex-direction:column;gap:10px;width:min(300px,70vw);margin-top:clamp(4px,2vh,18px)}
-  .tmenu button{text-align:left}
-  .tfoot{position:absolute;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);font-size:11px;color:var(--dim);opacity:.7}
-
-  /* ---------- 如何遊玩 ---------- */
-  #howto{background:rgba(6,7,14,.82)}
-  #howto .card{background:#171a28;border-radius:16px;border-top:4px solid var(--shift);padding:20px 24px;max-width:620px;width:calc(100% - 32px);max-height:calc(100% - 32px);overflow-y:auto}
-  #howto h2{margin:0 0 8px;font-size:24px}
-  #howto p{margin:8px 0;color:var(--dim);font-size:14px}
-  #howto p b{color:var(--ink)}
-  #howto .zlist{line-height:2}
-  .zc{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 5px 0 10px;vertical-align:0}
-  .zc.rusher{background:#ff5a4e}.zc.pathfinder{background:#f0c94a}.zc.breaker{background:#b77cf0}.zc.vaulter{background:#34d1c0}
-  #howto .ctrl{font-size:12px}
-  #btnHowBack{margin-top:10px;width:100%}
-
-  /* ---------- 結算：大數字 ---------- */
-  #result{background:rgba(6,7,14,.78)}
-  .rcard{width:min(760px,calc(100% - 32px));max-height:calc(100% - 24px);overflow-y:auto;text-align:center;padding:clamp(14px,3vh,28px) 20px}
-  .rcard h1{margin:0;font-size:clamp(38px,7vw,72px);font-weight:900;font-style:italic;letter-spacing:.01em}
-  #result.win h1{color:var(--hp)} #result.lose h1{color:var(--bad)}
-  #resTag{margin:2px 0 clamp(10px,3vh,26px);color:var(--dim);font-size:clamp(14px,2vw,18px)}
-  .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-  .st{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:clamp(8px,2vh,16px) 6px}
-  .st b{display:block;white-space:nowrap;font-size:clamp(28px,5.4vw,52px);font-weight:900;line-height:1.05;font-variant-numeric:tabular-nums;color:#fff}
-  .st b small{font-size:.5em;color:var(--dim);font-weight:700}
-  .st small{display:block;margin-top:4px;color:var(--dim);font-size:clamp(11px,1.5vw,14px)}
-  .comp{margin:clamp(10px,3vh,22px) auto 0;max-width:560px;text-align:left}
-  .comp>small{color:var(--dim)}
-  #resComp{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:5px 0}
-  #resLegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}
-  #resLegend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
-  .rbtns{display:flex;gap:10px;justify-content:center;margin-top:clamp(12px,3vh,26px)}
-  .rbtns button{min-width:170px}
-
-  /* 手機橫向：高度只有約 390px，全部縮一點 */
-  @media (max-height:460px){
-    .logo{font-size:clamp(44px,9vw,84px)}
-    .tmenu button,.rbtns button{min-height:42px;font-size:15px}
-    .tmenu{gap:7px}
-    .stats{gap:6px} .st{padding:6px 4px} .st b{font-size:28px}
+  @media (max-width:480px){             /* 手機直向：藏標題，狀態欄平均分配寬度 */
+    #hud h1{display:none}
+    .stat{min-width:0;flex:1;padding:3px 6px}
+    #hpStat{flex:1.4;max-width:none}
+    #brainStat{min-width:0}
   }
-  @media (max-width:560px){ .stats{grid-template-columns:repeat(3,1fr)} }
+  @media (min-width:900px) and (min-aspect-ratio:11/10){
+    #bar{flex-direction:row;justify-content:center;align-items:flex-end;padding-bottom:14px}
+    .row.builds{flex:0 1 460px} .row.opts{flex:0 1 300px}
+    .opt{min-height:52px}
+    #hud h1{font-size:20px} .stat{min-width:70px}
+    #minimap{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 62px)}
+  }
