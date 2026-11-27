@@ -1,7 +1,6 @@
 /* Game 的狀態欄位、重置與共用小函式。其他檔案用 Object.assign(Game, {...}) 把方法掛上來。 */
 import { CFG, C, R, N, idx, ix, iy, inB, clamp, rnd, cellOf, DIR4, DIR8, RADIO, TYPES } from '../config.js';
 import { Feel, FX, Input } from '../fx.js';
-import { t } from '../i18n.js';
 import { Grid } from '../grid.js';
 import { resolve, clearLine, sight, lineHasTrap, lookAhead, steer, hash01 } from '../physics.js';
 import { Memory, knowsTrap } from '../memory.js';
@@ -24,14 +23,13 @@ export const Game = {
     this.newPeriod();
     for (let k = 0; k < CFG.SCRAP.count; k++) this.spawnScrap(true);
     this.spotted = false; this.seenTypes = {};
-    this.stats = { items: 0, scraps: 0, escapes: 0 };   // 結算畫面用：用了幾個道具、撿了幾箱材料、甩掉幾次追兵
     for (let k = 0; k < CFG.WANDER.count; k++) {
       const i = this.randomFreeCell((x, y) => Math.hypot(x - RADIO.x, y - RADIO.y) > CFG.WANDER.minDist);
       if (i >= 0) this.makeWanderer(this.spawnZombie(this.rollType(true), undefined, i));
     }
     this.phase = 'title';
   },
-  begin() { this.phase = 'play'; FX.msg(t('msg.begin')); },
+  begin() { this.phase = 'play'; FX.msg('去撿金色材料箱，找藍色光柱的零件'); },
   newPeriod() { this.period = { picks: 0, parts: 0, escapes: 0, stuck: 0, vaults: 0, snared: 0, baited: 0, placed: 0, losEsc: 0, dodged: 0, esc: { rusher: 0, pathfinder: 0, breaker: 0, vaulter: 0 } }; },
   minutes() { return this.time / 60; },
   learnedRatio() { return Math.min(CFG.MEMORY.learnedMax, CFG.MEMORY.learnedPerUpdate * Memory.updates); },
