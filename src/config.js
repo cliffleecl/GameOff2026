@@ -7,13 +7,15 @@ export const CFG = {
   ITEM_COST: 8,         // 三種道具價格都一樣（玩家只要記一個數字）
   MAX_MATERIALS: 64,    // 材料上限＝8 個道具；血條下方的材料條以這個為滿格，每格＝一個道具
   // 跑酷專家：能翻越矮牆和自己放的障礙（翻越時稍微減速，落地後短暫加速）
-  PLAYER: { hp: 100, speed: 3.0, radius: 0.3, iframe: 0.5, vaultSlow: 0.8, boost: 1.3, boostTime: 1.5,   // 翻越落地後 1.5 秒加速 30%
+  PLAYER: { hp: 70, speed: 3.0,   radius: 0.3, iframe: 0.5, vaultSlow: 0.8, boost: 1.3, boostTime: 1.5,   // 翻越落地後 1.5 秒加速 30%
             regenDelay: 3, regenSafe: 6, regen: 5,
+            perchReach: 0.35,      // 站在矮牆／障礙上時，旁邊的殭屍多出來的攻擊距離（不能站在牆上當安全區）
             shoveEnabled: false,   // 推開機制先關掉（太強）；改成 true 就恢復
             shoveTrigger: 0.35, shoveRange: 1.4, shoveCd: 2.0, shoveTime: 0.22, shoveKnock: 7, shoveStun: 0.6 },
   PARTS: { goal: 6, delay: 5, minDist: 13, radioMin: 8 },
   SCRAP: { count: 12,   // 材料箱：撿到直接入帳
-            base: 6, farBonus: 10, respawn: 5, minDist: 6, pickR: 0.75 },
+            units: 1,          // 一箱補幾格材料條（一格＝ITEM_COST＝一個道具）
+            respawn: 5, minDist: 6, pickR: 0.75 },
   SPAWN: { startInterval: 6, minInterval: 1.2, ramp: 0.01, ringMin: 11, ringMax: 15,
            aliveBase: 3, alivePerMin: 2, maxAlive: 32, despawnDist: 22, loseT: 12, rusherOnly: 45 },
   HORDE: { first: 75, every: 80, warn: 6, base: 6, per: 2, gap: 0.3 },

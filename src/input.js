@@ -57,12 +57,19 @@ export const InputDOM = {
       Input.kx = x; Input.ky = y;
     };
     window.addEventListener('keydown', e => {
+      // 如何遊玩：←→（或 A D）換頁、Enter／空白鍵下一頁、Esc 返回
+      if (UI.screen === 'howto') {
+        if (e.code === 'Escape') UI.show('title');
+        else if (e.code === 'ArrowLeft' || e.code === 'KeyA') UI.stepHow(-1);
+        else if (['ArrowRight', 'KeyD', 'Enter', 'Space'].includes(e.code)) UI.stepHow(1);
+        e.preventDefault();
+        return;
+      }
       if (map[e.code]) { this.keys[e.code] = true; upd(); e.preventDefault(); return; }
       // 選單畫面：Enter／空白鍵＝主要按鈕，Esc＝返回
       if (UI.screen) {
         const ok = e.code === 'Enter' || e.code === 'Space';
         if (UI.screen === 'title' && ok) UI.start();
-        else if (UI.screen === 'howto' && (ok || e.code === 'Escape')) UI.show('title');
         else if (UI.screen === 'result' && ok) UI.restart(true);
         if (ok) e.preventDefault();
         return;

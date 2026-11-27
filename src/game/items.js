@@ -81,7 +81,6 @@ Object.assign(Game, {
         }
       }
       if (bumped && Feel.hitstop) this.hitstop = Math.max(this.hitstop, 0.05);
-      if (bumped) FX.msg(bumped > 1 ? t('msg.bumpN', { n: bumped }) : t('msg.bump1'));
     }
     for (const z of this.zombies) { z.repath = 0; resolve(z); }
     return true;

@@ -36,6 +36,9 @@
   #mseg{position:absolute;inset:0;display:flex;justify-content:space-evenly}
   #mseg i{width:1px;background:rgba(0,0,0,.7)}
   #pbar.low #pfill{background:var(--bad);animation:pulse .5s ease-in-out infinite alternate}
+  /* 撿到材料：材料條亮一下 */
+  #pbar.got .mat{animation:gotMat .55s ease-out}
+  @keyframes gotMat{0%{box-shadow:0 0 0 1px rgba(0,0,0,.4),0 0 14px 4px rgba(242,203,82,.95);transform:scaleY(1.6)}100%{box-shadow:0 0 0 1px rgba(0,0,0,.4);transform:scaleY(1)}}
 
   #ticker{position:absolute;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 54px);
           background:var(--panel);padding:5px 12px;border-radius:14px;font-size:13px;white-space:nowrap;max-width:92vw;overflow:hidden;text-overflow:ellipsis;pointer-events:none;transition:opacity .4s}
@@ -92,13 +95,51 @@
   @media (orientation:portrait){ body.touch #rotate{display:flex} }
   @media (max-width:640px){ .pill{width:118px;gap:5px;padding:0 8px} .slot{width:15px;height:15px} #sParts{gap:2px} }
 
+  /* ---------- 電腦：HUD 放大（螢幕大、離得遠，原本的尺寸在 PC 上太小） ---------- */
+  body:not(.touch) #hud{padding-top:12px;gap:12px}
+  body:not(.touch) .pill{height:50px;width:204px;gap:10px;padding:0 16px}
+  body:not(.touch) .pill .ico{width:26px;height:26px}
+  body:not(.touch) .slot{width:25px;height:25px}
+  body:not(.touch) #sParts{gap:5px}
+  body:not(.touch) #vTime{font-size:23px;min-width:58px}
+  body:not(.touch) #brainBar{height:11px;border-radius:6px}
+  body:not(.touch) #pbar{width:76px;margin-left:-38px}
+  body:not(.touch) #pbar .hp{height:9px;border-radius:5px}
+  body:not(.touch) #pbar .mat{height:8px;border-radius:4px;margin-top:3px}
+  body:not(.touch) #ticker{top:76px;font-size:17px;padding:7px 18px;border-radius:18px}
+  body:not(.touch) #report{top:76px;left:14px;width:min(360px,64vw);font-size:15px;padding:10px 14px 9px}
+  body:not(.touch) #report h2{font-size:17px}
+  body:not(.touch) #report li.comp{font-size:13px}
+  body:not(.touch) #evac{top:122px;font-size:21px;padding:10px 22px}
+  body:not(.touch) #evac small{font-size:15px}
+  body:not(.touch) #minimap{top:12px;right:14px}
+  body:not(.touch) #bar{padding-bottom:18px}
+  body:not(.touch) .row{gap:12px}
+  body:not(.touch) .bld{width:124px;min-height:76px;font-size:16px;gap:5px;border-radius:14px}
+  body:not(.touch) .bld .ico{width:34px;height:34px}
+  body:not(.touch) .bld kbd{font-size:13px;top:5px;right:9px}
+  body:not(.touch) .arrow{border-left-width:14px;border-right-width:14px;border-bottom-width:28px}
+  /* 大螢幕（1080p 以上）再大一點 */
+  @media (min-height:900px){
+    body:not(.touch) .pill{height:58px;width:236px}
+    body:not(.touch) .pill .ico{width:30px;height:30px}
+    body:not(.touch) .slot{width:29px;height:29px}
+    body:not(.touch) #vTime{font-size:27px}
+    body:not(.touch) #pbar{width:90px;margin-left:-45px}
+    body:not(.touch) #pbar .hp{height:11px} body:not(.touch) #pbar .mat{height:9px}
+    body:not(.touch) #ticker,body:not(.touch) #report{top:86px}
+    body:not(.touch) #ticker{font-size:19px}
+    body:not(.touch) .bld{width:140px;min-height:86px;font-size:18px}
+    body:not(.touch) .bld .ico{width:38px;height:38px}
+  }
+
   /* 選單開著時：藏起遊戲中的介面 */
   body.menu #hud, body.menu #bar, body.menu #stick, body.menu #minimap, body.menu #ticker, body.menu #report, body.menu #pbar{display:none !important}
 
   /* ---------- 全螢幕畫面共用 ---------- */
   .screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:auto;z-index:10}
   .screen.hide{display:none}
-  .tmenu button,.rbtns button,#btnHowBack{min-height:50px;font-size:17px;font-weight:700;border-radius:12px;padding:0 22px;background:rgba(14,16,26,.7);border-color:rgba(255,255,255,.16);backdrop-filter:blur(4px)}
+  .tmenu button,.rbtns button{min-height:50px;font-size:17px;font-weight:700;border-radius:12px;padding:0 22px;background:rgba(14,16,26,.7);border-color:rgba(255,255,255,.16);backdrop-filter:blur(4px)}
   .tmenu button:hover,.rbtns button:hover{border-color:var(--shift)}
   button.primary{background:var(--go);color:#1d1107;border-color:transparent}
   button.primary:hover{border-color:#fff}
@@ -121,17 +162,66 @@
   .tmenu button{text-align:left}
   .tfoot{position:absolute;right:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);font-size:11px;color:var(--dim);opacity:.7}
 
-  /* ---------- 如何遊玩 ---------- */
-  #howto{background:rgba(6,7,14,.82)}
-  #howto .card{background:#171a28;border-radius:16px;border-top:4px solid var(--shift);padding:20px 24px;max-width:620px;width:calc(100% - 32px);max-height:calc(100% - 32px);overflow-y:auto}
-  #howto h2{margin:0 0 8px;font-size:24px}
-  #howto p{margin:8px 0;color:var(--dim);font-size:14px}
-  #howto p b{color:var(--ink)}
-  #howto .zlist{line-height:2}
-  .zc{display:inline-block;width:10px;height:10px;border-radius:50%;margin:0 5px 0 10px;vertical-align:0}
-  .zc.rusher{background:#ff5a4e}.zc.pathfinder{background:#f0c94a}.zc.breaker{background:#b77cf0}.zc.vaulter{background:#34d1c0}
-  #howto .ctrl{font-size:12px}
-  #btnHowBack{margin-top:10px;width:100%}
+  /* ---------- 如何遊玩：全畫面，一頁一個段落（左圖右文） ---------- */
+  #howto{flex-direction:column;align-items:stretch;justify-content:flex-start;background:linear-gradient(180deg,#10131f 0%,#0b0d16 100%);
+         padding:calc(env(safe-area-inset-top,0px) + 12px) calc(env(safe-area-inset-right,0px) + 20px) calc(env(safe-area-inset-bottom,0px) + 12px) calc(env(safe-area-inset-left,0px) + 20px)}
+  .hw-top{display:flex;align-items:center;gap:16px;flex:none}
+  #howto h2{margin:0;font-size:clamp(18px,2.4vw,26px);font-weight:900;font-style:italic;white-space:nowrap}
+  .hw-back{display:flex;align-items:center;gap:6px;min-height:42px;padding:0 16px 0 10px;font-size:16px;font-weight:700;color:var(--ink);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}
+  .hw-back>span:first-child{font-size:26px;line-height:1;margin-top:-3px}
+  .hw-back:hover{border-color:var(--shift)}
+  .hw-tabs{display:flex;gap:6px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+  .hw-tab{display:flex;align-items:center;gap:6px;min-height:38px;padding:0 12px;font-size:14px;color:var(--dim);background:transparent;border-color:transparent;white-space:nowrap}
+  .hw-tab i{font-style:normal;font-weight:800;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:rgba(255,255,255,.08)}
+  .hw-tab.on{color:var(--ink);border-color:var(--shift);background:rgba(52,209,192,.1)}
+  .hw-tab.on i{background:var(--shift);color:#0b0d16}
+  .hw-pages{flex:1;min-height:0;position:relative;margin:10px 0}
+  .hw-page{position:absolute;inset:0;display:none;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:clamp(16px,4vw,56px);align-items:center}
+  .hw-page.on{display:grid;animation:hwIn .35s ease-out}
+  @keyframes hwIn{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+  .hw-art{height:100%;min-height:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 60%,rgba(52,209,192,.08),transparent 70%);border-radius:18px}
+  .hw-art>svg{width:100%;height:100%;max-height:100%}
+  .hw-text{max-width:520px}
+  .hw-num{color:var(--shift);font-weight:800;font-size:13px;letter-spacing:.1em}
+  .hw-text h3{margin:4px 0 12px;font-size:clamp(24px,3.6vw,42px);font-weight:900;line-height:1.1}
+  .hw-body{color:var(--dim);font-size:clamp(14px,1.6vw,18px);line-height:1.6}
+  .hw-body p{margin:0 0 .7em} .hw-body b{color:var(--ink)} .hw-body em{font-style:normal;color:var(--gold);font-weight:700}
+  /* 殭屍、操作：圖比較多，改成上下排 */
+  .hw-page.wide{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);gap:10px}
+  .hw-page.wide .hw-text{order:-1;max-width:none;display:flex;align-items:baseline;gap:6px 16px;flex-wrap:wrap}
+  .hw-page.wide .hw-text h3{margin:0;font-size:clamp(20px,2.6vw,30px)}
+  .hw-page.wide .hw-num{display:none}
+  .hw-page.wide .hw-body p{margin:0}
+  .hw-zgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;width:100%;height:100%}
+  .hw-z{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px;border-radius:14px;background:#171a28;border-top:4px solid var(--zc);min-height:0;text-align:center}
+  .hw-z svg{width:100%;flex:0 1 auto;min-height:0;max-height:300px}
+  .hw-z b{font-size:clamp(16px,2vw,22px);color:var(--zc)}
+  .hw-z small{color:var(--dim);font-size:clamp(12px,1.3vw,15px);line-height:1.45}
+  .hw-z small b{font-size:inherit;color:var(--ink)}
+  .hw-ctrl{display:grid;grid-template-columns:1fr 1fr;gap:16px;width:100%;height:100%}
+  .hw-ctrl>div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:12px;border-radius:14px;background:#171a28;min-height:0;text-align:center}
+  .hw-ctrl b{font-size:18px}
+  .hw-ctrl svg{width:100%;flex:0 1 auto;min-height:0;max-height:260px}
+  .hw-ctrl small{color:var(--dim);font-size:clamp(12px,1.3vw,15px);line-height:1.5}
+  .hw-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none}
+  .hw-foot button{min-height:46px;min-width:140px;font-size:16px;font-weight:700}
+  .hw-foot button:disabled{opacity:.3;cursor:default}
+  .hw-dots{display:flex;gap:8px}
+  .hw-dots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.2);transition:all .25s}
+  .hw-dots i.on{width:24px;border-radius:4px;background:var(--shift)}
+  /* 手機橫向（高度約 390）：分頁籤只留數字、文字縮小 */
+  @media (max-height:460px){
+    #howto{padding-top:calc(env(safe-area-inset-top,0px) + 6px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 6px)}
+    .hw-tab span{display:none} .hw-tab{padding:0 6px;min-height:34px}
+    .hw-back{min-height:36px}
+    .hw-pages{margin:6px 0}
+    .hw-text h3{font-size:22px;margin-bottom:6px}
+    .hw-body{font-size:13px;line-height:1.5}
+    .hw-foot button{min-height:38px;min-width:110px;font-size:14px}
+    .hw-z{padding:6px} .hw-z small{font-size:11px} .hw-ctrl>div{padding:6px} .hw-ctrl small{font-size:11px}
+    .hw-page.wide .hw-text h3{font-size:18px}
+  }
+  @media (max-width:700px){ .hw-tab span{display:none} }
 
   /* ---------- 結算：大數字 ---------- */
   #result{background:rgba(6,7,14,.78)}

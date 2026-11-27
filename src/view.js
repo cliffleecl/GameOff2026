@@ -38,25 +38,27 @@ export const View = {
     this.camDir = new THREE.Vector3(0, 0.82, 0.57).normalize();
     this.camLook = new THREE.Vector3();
     // 夜晚：環境光和月光都壓得很暗，主要靠手電筒看路（殭屍的發光眼睛在黑暗裡最先被看到）
-    this.scene.add(new THREE.HemisphereLight(0x7f8fcf, 0x1a1626, 0.24));
+    this.scene.add(new THREE.HemisphereLight(0x7f8fcf, 0x1a1626, 0.34));
     const sun = new THREE.DirectionalLight(0xbfcaff, 0.2);
     sun.castShadow = !this.mobile; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.0015;
     Object.assign(sun.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15, near: 1, far: 50 });
     this.scene.add(sun, sun.target); this.sun = sun;
-    // 手電筒：從角色胸口往面向的方向照，廢墟會擋住光（有陰影）
-    this.flash = new THREE.SpotLight(0xfff0d0, 3.2, 13, 0.6, 0.5, 1.1);
+    // 手電筒：從角色胸口往面向的方向照，廢墟會擋住光（有陰影）。角度放寬、瞄準點拉近，光圈從腳前就開始亮
+    this.flash = new THREE.SpotLight(0xfff0d0, 3.2, 12, 0.72, 0.55, 1.1);
     this.flash.castShadow = true; this.flash.shadow.mapSize.set(512, 512); this.flash.shadow.bias = -0.002;
     Object.assign(this.flash.shadow.camera, { near: 0.3, far: 13 });
     this.scene.add(this.flash, this.flash.target);
-    // 角色身邊一小圈微光：背後也看得到自己和貼身的殭屍
-    this.pLight = new THREE.PointLight(0xffc48a, 0.55, 3.6, 1.6); this.scene.add(this.pLight);
-    // 即時光源只留這 4 個（環境、月光、手電筒、身邊微光）：每多一個光源，每個像素都要多算一次，手機最吃這個。
+    // 角色身上的暖光：看得清自己，背後貼身的殭屍也看得到
+    this.pLight = new THREE.PointLight(0xffb070, 1.5, 5.5, 1.3); this.scene.add(this.pLight);
+    // 營火：無線電據點的照明，標題畫面和遊戲中一眼就找得到據點（固定位置、會閃爍）
+    this.fireLight = new THREE.PointLight(0xff8a3a, 2.2, 8, 1.4); this.scene.add(this.fireLight);
+    // 即時光源只留這 5 個（環境、月光、手電筒、身邊暖光、營火）：每多一個光源，每個像素都要多算一次，手機最吃這個。
     // 無線電燈光、直升機探照燈改用「地面發光貼圖」假裝，看起來差不多、幾乎不花效能。
     const gc = document.createElement('canvas'); gc.width = gc.height = 64; const gg = gc.getContext('2d');
     const grd = gg.createRadialGradient(32, 32, 0, 32, 32, 32); grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.4, 'rgba(255,255,255,.35)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
     gg.fillStyle = grd; gg.fillRect(0, 0, 64, 64);
     this.glowTex = new THREE.CanvasTexture(gc);
-    this.makeArena(); this.makeShared(); this.makePlayer(); this.makePools(); this.makeOverlay(); this.makeRadio(); this.makeHeli();
+    this.makeArena(); this.makeShared(); this.makePlayer(); this.makePools(); this.makeSpeedLines(); this.makeOverlay(); this.makeRadio(); this.makeHeli();
     // 霧團貼圖：柔邊圓形
     const fc = document.createElement('canvas'); fc.width = fc.height = 64; const fg = fc.getContext('2d');
     const gr = fg.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(190,200,230,0.9)'); gr.addColorStop(1, 'rgba(190,200,230,0)');
@@ -263,6 +265,50 @@ export const View = {
     this.radioParts = slots.map((p, k) => { const m = new THREE.Mesh(partGeo(k), this.zMat); m.position.set(...p); m.scale.setScalar(0.75); m.visible = false; g.add(m); return m; });
     const [x, z] = W2(RADIO.x, RADIO.y); g.position.set(x, 0, z); this.scene.add(g);
     this.rGlow = this.glowDecal(0xff5040, 7); this.rGlow.position.set(x + 0.3, 0.04, z);
+    this.makeFire(x - 1.6, z + 0.9);
+  },
+  /** 營火：木柴＋火焰（加法混合的錐體，會跳動）＋火星＋地面光暈＋一個真光源（fireLight） */
+  makeFire(x, z) {
+    const g = new THREE.Group(); g.position.set(x, 0, z);
+    const wood = phong({ color: 0x4a3222 }), stone = phong({ color: 0x55575f });
+    for (let k = 0; k < 4; k++) {
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 0.75, 6), wood);
+      log.rotation.set(Math.PI / 2 - 0.35, k * Math.PI / 2 + 0.4, 0, 'YXZ'); log.position.y = 0.12; log.castShadow = true; g.add(log);
+    }
+    for (let k = 0; k < 8; k++) {
+      const a = k / 8 * Math.PI * 2, s = new THREE.Mesh(new THREE.DodecahedronGeometry(0.1, 0), stone);
+      s.position.set(Math.cos(a) * 0.45, 0.06, Math.sin(a) * 0.45); s.rotation.set(a, a * 2, 0); g.add(s);
+    }
+    const flame = (col, r, h) => {
+      const m = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7, 1, true),
+        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+      m.position.y = 0.12 + h / 2; g.add(m); return m;
+    };
+    const flames = [flame(0xff5a14, 0.28, 0.8), flame(0xff9a2a, 0.2, 0.62), flame(0xffe27a, 0.11, 0.42)];
+    const embers = Array.from({ length: 10 }, () => {
+      const m = new THREE.Mesh(this.G.part, new THREE.MeshBasicMaterial({ color: 0xffb040, transparent: true, fog: false }));
+      m.userData = { t: Math.random(), a: Math.random() * 6.283, r: 0, w: 1 }; g.add(m); return m;
+    });
+    this.scene.add(g);
+    const glow = this.glowDecal(0xff7a28, 6.5); glow.position.set(x, 0.045, z);
+    this.fireLight.position.set(x, 1.1, z);
+    this.fire = { g, flames, embers, glow };
+  },
+  updateFire(real, t) {
+    const F = this.fire, n = Math.sin(t * 11) * 0.5 + Math.sin(t * 17.3) * 0.3 + Math.sin(t * 5.1) * 0.2;   // 不規則的閃爍
+    F.flames.forEach((m, k) => {
+      const s = 1 + n * 0.12 * (k + 1), h = m.geometry.parameters.height;
+      m.scale.set(1 - n * 0.05, s, 1 - n * 0.05); m.rotation.y = t * (1 + k) * 0.7; m.position.y = 0.12 + h * s / 2;
+    });
+    this.fireLight.intensity = 2.2 + n * 0.45;
+    F.glow.material.opacity = 0.42 + n * 0.08;
+    for (const e of F.embers) {
+      const u = e.userData; u.t += real * 0.7;
+      if (u.t > 1) { u.t = 0; u.a = Math.random() * 6.283; u.r = Math.random() * 0.2; u.w = 0.5 + Math.random(); }
+      const r = u.r + u.t * 0.25, a = u.a + u.t * u.w * 3;
+      e.position.set(Math.cos(a) * r, 0.3 + u.t * 1.8, Math.sin(a) * r);
+      e.material.opacity = 1 - u.t; e.scale.setScalar(0.7 * (1 - u.t * 0.6));
+    }
   },
   makeShared() {
     const L = c => phong({ color: c });
@@ -277,7 +323,7 @@ export const View = {
     this.M = {
       jeans: L(0x3c4f7a), skin: L(0x93ad6c), hair: L(0x2a2522),
       shirt: { rusher: L(0xd9483f), pathfinder: L(0xf0c94a), breaker: L(0x9b62d9), vaulter: L(0x34d1c0) },
-      stuck: new THREE.MeshBasicMaterial({ color: 0xffd34d }), dust: new THREE.MeshBasicMaterial({ color: 0xd8dbe4 }),
+      stuck: new THREE.MeshBasicMaterial({ color: 0xffd34d }), dust: new THREE.MeshBasicMaterial({ color: 0x8f8678 }),
       obstacle: L(0x3a3f52), stripe: L(0xe9a23b),
       barBg: new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6, depthTest: false }),
       barFg: new THREE.MeshBasicMaterial({ color: 0x7be08f, depthTest: false }),
@@ -390,8 +436,53 @@ export const View = {
     for (let k = 0; k < n; k++) {
       const p = this.parts.find(q => q.t <= 0); if (!p) break;
       const a = Math.random() * 6.28, s = 1 + Math.random() * 2.5, [wx, wz] = W2(x, y);
-      p.t = 0.6; p.m.material = mat; p.m.visible = true; p.m.position.set(wx, 0.5, wz);
+      p.t = 0.6; p.t0 = 0; p.m.material = mat; p.m.visible = true; p.m.position.set(wx, 0.5, wz); p.m.scale.setScalar(1);
       p.vx = Math.cos(a) * s; p.vz = Math.sin(a) * s; p.vy = up + Math.random() * 2;
+    }
+  },
+  /** 塵土：貼著地面往外散、比較大顆、慢慢縮小 */
+  dustPuff(x, y, n) {
+    const [wx, wz] = W2(x, y);
+    for (let k = 0; k < n; k++) {
+      const p = this.parts.find(q => q.t <= 0); if (!p) break;
+      const a = Math.random() * 6.28, s = 0.8 + Math.random() * 1.4;
+      p.t = p.t0 = 0.45 + Math.random() * 0.25; p.m.material = this.M.dust; p.m.visible = true;
+      p.m.position.set(wx + Math.cos(a) * 0.2, 0.06, wz + Math.sin(a) * 0.2); p.m.scale.setScalar(2.2 + Math.random() * 1.6);
+      p.vx = Math.cos(a) * s; p.vz = Math.sin(a) * s; p.vy = 0.6 + Math.random() * 0.8;
+    }
+  },
+  /** 速度線：加速時從角色身邊往後拉的細長光條（加法混合），一看就知道「現在比較快」 */
+  makeSpeedLines() {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 4; const g = c.getContext('2d');
+    const gr = g.createLinearGradient(0, 0, 64, 0); gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.75, 'rgba(255,255,255,.9)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 64, 4);
+    const tex = new THREE.CanvasTexture(c), geo = new THREE.PlaneGeometry(1, 1); geo.rotateX(-Math.PI / 2);
+    this.speedLines = Array.from({ length: 18 }, () => {
+      const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, color: 0xfff1d6, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+      m.visible = false; m.renderOrder = 3; this.scene.add(m); return { m, t: 0, life: 0.3, vx: 0, vz: 0 };
+    });
+    this.lineAcc = 0;
+  },
+  updateSpeedLines(real, Pd, px, pz) {
+    const sp = Math.hypot(Pd.vx, Pd.vy), on = Pd.boostT > 0 && sp > 1 && !this.boarded;
+    if (on) {
+      this.lineAcc += real * (this.lineKick ? 70 : 38); this.lineKick = 0;
+      const a = Math.atan2(Pd.vy, Pd.vx), dx = Math.cos(a), dz = Math.sin(a);
+      while (this.lineAcc >= 1) {
+        this.lineAcc--;
+        const L = this.speedLines.find(q => q.t <= 0); if (!L) break;
+        const side = (Math.random() - 0.5) * 1.5, back = 0.2 + Math.random() * 0.9, len = 0.9 + Math.random() * 1.1;
+        L.t = L.life = 0.18 + Math.random() * 0.14;
+        L.m.position.set(px - dx * back - dz * side, 0.25 + Math.random() * 1.0, pz - dz * back + dx * side);
+        L.m.rotation.y = -a; L.m.scale.set(len, 1, 0.06 + Math.random() * 0.05); L.m.visible = true;
+        L.vx = -dx * 5; L.vz = -dz * 5;                         // 往後飄：跟角色往前跑加起來，線條快速掠過
+      }
+    } else this.lineAcc = 0;
+    for (const L of this.speedLines) {
+      if (L.t <= 0) continue;
+      L.t -= real; L.m.position.x += L.vx * real; L.m.position.z += L.vz * real;
+      const k = L.t / L.life; L.m.material.opacity = Math.max(0, Math.sin(k * Math.PI)) * 0.95;
+      if (L.t <= 0) L.m.visible = false;
     }
   },
 
@@ -410,8 +501,8 @@ export const View = {
     // 殭屍殺不死：跟丟你之後慢慢沉進地面散掉
     FX.despawn = z => { const o = this.zMap.get(z.id); if (!o) return; this.zMap.delete(z.id); o.alert.visible = false; this.corpses.push({ o, t: 0 }); };
     FX.stuck = () => {};
-    FX.vault = e => { if (Feel.hitfx) this.burst(e.x, e.y, this.M.dust, 4, 1); };
-    FX.boost = e => { if (Feel.hitfx) this.burst(e.x, e.y, this.M.dust, 6, 1.5); };
+    FX.vault = e => { if (Feel.hitfx) this.dustPuff(e.x, e.y, 4); };                 // 起跳：腳下揚起一點塵土
+    FX.boost = e => { if (Feel.hitfx) this.dustPuff(e.x, e.y, 9); this.lineKick = 1; }; // 落地：一圈塵土＋速度線開始
     FX.hurt = () => {
       if (Feel.shake) this.shake = Math.max(this.shake, 0.35);
       const f = document.getElementById('flash'); f.style.transition = 'none'; f.style.opacity = '1';
@@ -419,7 +510,7 @@ export const View = {
     };
     FX.shove = () => { this.P.waveVis = 1; if (Feel.shake) this.shake = Math.max(this.shake, 0.2); };
     FX.broke = () => { if (Feel.shake) this.shake = Math.max(this.shake, 0.18); };
-    FX.pickup = s => { this.burst(s.x, s.y, this.M.gold, 8, 2); UI.msg(Game.materials >= CFG.MAX_MATERIALS ? tr('msg.full') : tr('msg.pickup', { n: s.value })); };
+    FX.pickup = s => { this.burst(s.x, s.y, this.M.gold, 8, 2); UI.flashMat(); };   // 不跳文字：材料條閃一下就知道補了一格
     FX.part = (p, n) => { this.burst(p.x, p.y, this.M.partM, 16, 3); if (n < CFG.PARTS.goal) UI.msg(tr('msg.part', { part: tr('part.' + ((n - 1) % 6)), n, goal: CFG.PARTS.goal })); if (Feel.slowmo) Game.slowT = 0.35; };
     FX.horde = (dir, warn) => {
       const d = this.dirName(dir);
@@ -548,11 +639,12 @@ export const View = {
       if (z.stuckMark > 0) o.body.position.x = Math.sin(t * 40) * 0.03; else o.body.position.x = 0;
     }
     this.blobs.count = nb; this.blobs.instanceMatrix.needsUpdate = true;
-    this.pLight.position.set(px, 1.4, pz);
+    // 暖光放在角色前上方（靠鏡頭那一側），照亮看得到的那一面，而不是只照頭頂
+    this.pLight.position.set(px + this.camDir.x * 0.9, 1.5 + P.hop, pz + this.camDir.z * 0.9);
     // 手電筒跟著角色面向（用畫面上的轉向角度，比較順）
     const fd = Math.PI / 2 - (P.yaw ?? 0), fx = Math.cos(fd), fz = Math.sin(fd);
     this.flash.position.set(px + fx * 0.25, 1.15 + P.hop, pz + fz * 0.25);
-    this.flash.target.position.set(px + fx * 6, 0, pz + fz * 6);
+    this.flash.target.position.set(px + fx * 3.6, 0, pz + fz * 3.6);
     this.flash.intensity = this.boarded ? 0 : 3.2;
     for (let k = this.corpses.length - 1; k >= 0; k--) {
       const c = this.corpses[k], g = c.o.g; c.t += real;
@@ -607,10 +699,13 @@ export const View = {
     this.radioLeds.material.color.setHex(Math.floor(t * 3) % 2 ? 0x6fdc8c : 0x2f6b40);
     this.radioParts.forEach((m, k) => { m.visible = k < Game.parts; });
     this.updateHeli(real, t);
+    this.updateFire(real, t);
 
     for (const p of this.parts) {
       if (p.t <= 0) continue;
-      p.t -= dt; p.vy -= 12 * dt;
+      p.t -= dt;
+      if (p.t0) { p.vx *= 0.9; p.vz *= 0.9; p.vy *= 0.9; p.m.scale.multiplyScalar(0.97); }   // 塵土：很快慢下來、縮小
+      else p.vy -= 12 * dt;
       p.m.position.x += p.vx * dt; p.m.position.y = Math.max(0.03, p.m.position.y + p.vy * dt); p.m.position.z += p.vz * dt;
       if (p.t <= 0) p.m.visible = false;
     }
@@ -622,32 +717,48 @@ export const View = {
     let tx, tz;
     if (this.portrait) { tx = clamp(px, -ext[1], ext[1]); tz = clamp(pz, -ext[0], ext[0]); }
     else { tx = clamp(px, -ext[0], ext[0]); tz = clamp(pz, -ext[1], ext[1]); }
-    // 剛開局（從標題畫面切過來）鏡頭直接對準主角，不要慢慢飄過去
-    const kc = this.camSnap ? 1 : Math.min(1, real * 6); this.camSnap = false;
+    // 開場運鏡期間（intro）和「再玩一次」（camSnap）：注視點直接對準主角，鏡頭位置由運鏡負責
+    const kc = this.camSnap || this.intro ? 1 : Math.min(1, real * 6); this.camSnap = false;
     this.camLook.x += (tx - this.camLook.x) * kc; this.camLook.z += (tz - this.camLook.z) * kc;
+    let look = this.camLook;
     if (Game.phase === 'title') {
       // 標題畫面：鏡頭慢慢繞著無線電轉，角色在畫面右半邊（左半邊留給 Logo）
       this.orbit = (this.orbit || 0) + real * 0.06;
       const [rx, rz] = W2(RADIO.x, RADIO.y), d = 12;
       this.camLook.set(rx - 3.2 * Math.cos(this.orbit), 0, rz + 3.2 * Math.sin(this.orbit) * 0.3);
       this.cam.position.set(rx + Math.sin(this.orbit) * d, 7.5, rz + Math.cos(this.orbit) * d);
-    } else this.cam.position.copy(this.camDir).multiplyScalar(this.camDist).add(this.camLook);
+    } else {
+      this.cam.position.copy(this.camDir).multiplyScalar(this.camDist).add(this.camLook);
+      if (this.intro) {   // 開場運鏡：從標題畫面的鏡位，滑到遊玩鏡位
+        const I = this.intro; I.t += real;
+        const u = Math.min(1, I.t / I.dur), k = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+        this.cam.position.lerpVectors(I.pos, this.cam.position.clone(), k);
+        this.cam.position.y += Math.sin(k * Math.PI) * 2.5;   // 中途稍微拉高，像吊臂鏡頭
+        look = I.look.clone().lerp(this.camLook, k);
+        if (u >= 1) this.intro = null;
+      }
+    }
     if (this.shake > 0) {
       const s = this.shake * this.shake;
       this.cam.position.x += (Math.random() - 0.5) * s * 1.6; this.cam.position.y += (Math.random() - 0.5) * s; this.cam.position.z += (Math.random() - 0.5) * s * 1.6;
       this.shake = Math.max(0, this.shake - real * 1.6);
     }
-    this.cam.lookAt(this.camLook);
+    this.cam.lookAt(look);
     // 飄動的霧團：在玩家周圍一圈慢慢漂，離太遠就換到另一邊
     for (const m of this.mist) {
       m.position.x += m.userData.vx * real; m.position.z += m.userData.vz * real;
       const dx = m.position.x - this.camLook.x, dz = m.position.z - this.camLook.z;
       if (Math.hypot(dx, dz) > 17) { const a = Math.random() * 6.283, r = 9 + Math.random() * 6; m.position.x = this.camLook.x + Math.cos(a) * r; m.position.z = this.camLook.z + Math.sin(a) * r; }
     }
-    if (Pd.boostT > 0 && Math.random() < 0.5) this.burst(Pd.x, Pd.y, this.M.dust, 1, 0.4);   // 加速時腳下揚塵
+    this.updateSpeedLines(real, Pd, px, pz);
+    // 加速時鏡頭視角稍微拉寬，增加速度感
+    const fov = 42 + (Pd.boostT > 0 && !this.boarded && Game.phase === 'play' ? 4 : 0);
+    if (Math.abs(this.cam.fov - fov) > 0.01) { this.cam.fov += (fov - this.cam.fov) * Math.min(1, real * 8); this.cam.updateProjectionMatrix(); }
     this.sun.target.position.copy(this.camLook); this.sun.position.set(this.camLook.x - 6, 16, this.camLook.z + 8);
     this.r.render(this.scene, this.cam);
   },
+  /** 開始遊戲：記下標題畫面的鏡位，接下來 dur 秒滑到遊玩鏡位 */
+  startIntro(dur = 1.6) { this.intro = { pos: this.cam.position.clone(), look: this.camLook.clone(), t: 0, dur }; },
   /** 世界座標 → 螢幕座標（給指引箭頭用） */
   toScreen(x, y, h = 0.5) {
     const [wx, wz] = W2(x, y), v = new THREE.Vector3(wx, h, wz).project(this.cam);

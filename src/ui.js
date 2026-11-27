@@ -6,6 +6,7 @@ import { Game, gameTimers } from './game.js';
 import { View } from './view.js';
 import { I18N, LANGS, t, guessLang } from './i18n.js';
 import { ICONS } from './icons.js';
+import { buildHowto, HOWTO_PAGES } from './howto.js';
 
 const LS_LANG = 'bs-lang';
 const store = {   // localStorage 可能被擋（無痕、iframe），讀寫都包起來
@@ -22,7 +23,7 @@ export const UI = {
     const $ = id => document.getElementById(id);
     for (const id of ['pbar', 'pfill', 'mfill', 'mseg', 'vTime', 'ticker', 'report', 'rTitle', 'rBody', 'builds', 'minimap', 'arPart', 'arRadio',
                       'evac', 'brainFill', 'brainStat', 'sParts', 'title', 'howto', 'result', 'btnStart', 'btnHow', 'btnLang', 'btnHowBack',
-                      'btnAgain', 'btnMenu', 'resTitle', 'resTag', 'resStats', 'resComp', 'resLegend']) this.el[id] = $(id);
+                      'btnAgain', 'btnMenu', 'resTitle', 'resTag', 'resStats', 'resComp', 'resLegend', 'hwPages', 'hwTabs', 'hwDots', 'hwPrev', 'hwNext']) this.el[id] = $(id);
     const e = this.el;
     // 圖示：data-icon="clock" → 換成 SVG
     for (const i of document.querySelectorAll('[data-icon]')) i.innerHTML = ICONS[i.dataset.icon];
@@ -34,8 +35,17 @@ export const UI = {
 
     e.builds.addEventListener('pointerdown', ev => { const b = ev.target.closest('.bld'); if (b) { ev.preventDefault(); Game.drop(b.dataset.b); this.sync(); } });
     e.btnStart.addEventListener('click', () => this.start());
-    e.btnHow.addEventListener('click', () => this.show('howto'));
+    // 如何遊玩：分頁（上方分頁籤、下方上一頁／下一頁；最後一頁的「下一頁」變成「開始遊戲」）
+    buildHowto(e.hwPages, e.hwTabs, e.hwDots);
+    e.btnHow.addEventListener('click', () => { this.howPage = 0; this.show('howto'); });
     e.btnHowBack.addEventListener('click', () => this.show('title'));
+    e.hwTabs.addEventListener('click', ev => { const b = ev.target.closest('.hw-tab'); if (b) this.setHowPage(+b.dataset.k); });
+    e.hwPrev.addEventListener('click', () => this.stepHow(-1));
+    e.hwNext.addEventListener('click', () => this.stepHow(1));
+    // 手機：左右滑動換頁
+    let sx = null;
+    e.hwPages.addEventListener('pointerdown', ev => { sx = ev.clientX; });
+    e.hwPages.addEventListener('pointerup', ev => { if (sx !== null && Math.abs(ev.clientX - sx) > 50) this.stepHow(ev.clientX < sx ? 1 : -1); sx = null; });
     e.btnLang.addEventListener('click', () => this.setLang(LANGS[(LANGS.indexOf(I18N.lang) + 1) % LANGS.length]));
     e.btnAgain.addEventListener('click', () => this.restart(true));
     e.btnMenu.addEventListener('click', () => this.restart(false));
@@ -50,8 +60,25 @@ export const UI = {
     for (const k of ['title', 'howto', 'result']) this.el[k].classList.toggle('hide', k !== which);
     document.body.classList.toggle('menu', !!which);       // 選單開著時藏 HUD、道具按鈕、搖桿
     this.screen = which;
+    if (which === 'howto') this.setHowPage(this.howPage || 0);
   },
-  start() { this.show(null); Game.begin(); View.camSnap = true; },
+  /* ---------- 如何遊玩：換頁 ---------- */
+  howPage: 0,
+  setHowPage(k) {
+    const e = this.el; this.howPage = clamp(k, 0, HOWTO_PAGES - 1);
+    for (const g of [e.hwPages, e.hwTabs, e.hwDots]) for (const c of g.children) c.classList.toggle('on', +c.dataset.k === this.howPage);
+    e.hwPrev.disabled = this.howPage === 0;
+    const last = this.howPage === HOWTO_PAGES - 1;
+    e.hwNext.textContent = t(last ? 'btn.start' : 'btn.next');
+    e.hwNext.dataset.last = last ? '1' : '';
+  },
+  /** 下一頁／上一頁；最後一頁再按下一頁＝開始遊戲 */
+  stepHow(d) {
+    if (d > 0 && this.howPage === HOWTO_PAGES - 1) { this.show('title'); this.start(); return; }
+    this.setHowPage(this.howPage + d);
+  },
+  /** 從標題進場：鏡頭從標題鏡位滑到遊玩鏡位；「再玩一次」直接切過去 */
+  start() { const fromTitle = this.screen === 'title'; this.show(null); Game.begin(); if (fromTitle) View.startIntro(); else View.camSnap = true; },
   restart(play) {
     for (const o of View.zMap.values()) View.scene.remove(o.g);
     for (const c of View.corpses) View.scene.remove(c.o.g);
@@ -75,6 +102,7 @@ export const UI = {
     for (const n of document.querySelectorAll('[data-i18n]')) n.textContent = t(n.dataset.i18n);
     for (const n of document.querySelectorAll('[data-i18n-html]')) n.innerHTML = t(n.dataset.i18nHtml);   // 只有自己寫的翻譯字串，沒有外部輸入
     this.el.btnLang.textContent = t('btn.lang', { lang: t('lang.name') });
+    if (this.screen === 'howto') this.setHowPage(this.howPage);
     if (Game.phase === 'over' && this.lastWin !== undefined) this.over(this.lastWin);
   },
 
@@ -88,6 +116,8 @@ export const UI = {
     e.report.classList.remove('hide'); this.reportT = 5;
   },
   hideReport() { this.el.report.classList.add('hide'); this.reportT = 0; },
+  /** 撿到材料：材料條閃一下（取代「+8 材料」的文字提示） */
+  flashMat() { const b = this.el.pbar; b.classList.remove('got'); void b.offsetWidth; b.classList.add('got'); },
 
   /* ---------- 結算 ---------- */
   over(win) {
@@ -114,7 +144,7 @@ export const UI = {
   /* ---------- 小地圖 ---------- */
   sizeMinimap() {
     const mm = this.el.minimap; if (!mm) return;
-    const port = window.innerHeight > window.innerWidth, sc = port || document.body.classList.contains('touch') ? 3 : 4;
+    const port = window.innerHeight > window.innerWidth, sc = port || document.body.classList.contains('touch') ? 3 : window.innerHeight >= 900 ? 6 : 5;
     const w = (port ? R : C) * sc, h = (port ? C : R) * sc, dpr = Math.min(window.devicePixelRatio || 1, 2);
     mm.width = w * dpr; mm.height = h * dpr; mm.style.width = w + 'px'; mm.style.height = h + 'px';
     this.mmScale = sc; this.mmDpr = dpr; this.mmPort = port;

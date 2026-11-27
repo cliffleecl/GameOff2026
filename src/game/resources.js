@@ -20,8 +20,8 @@ Object.assign(Game, {
       (initial ? Math.hypot(x - RADIO.x, y - RADIO.y) > 4 : Math.hypot(x - P.x, y - P.y) > S.minDist) &&
       this.scraps.every(s => Math.hypot(s.x - x, s.y - y) > 3));
     if (i < 0) return;
-    const x = ix(i) + 0.5, y = iy(i) + 0.5, far = Math.min(1, Math.hypot(x - RADIO.x, y - RADIO.y) / 18);
-    this.scraps.push({ id: this.scrapId++, x, y, value: Math.round(S.base + S.farBonus * far) });
+    const x = ix(i) + 0.5, y = iy(i) + 0.5;
+    this.scraps.push({ id: this.scrapId++, x, y, value: S.units * CFG.ITEM_COST });   // 一箱＝材料條一格
   },
   spawnPart() {
     const PC = CFG.PARTS, P = this.player;

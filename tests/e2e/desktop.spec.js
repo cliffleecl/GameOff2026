@@ -157,7 +157,7 @@ test('血量歸零 → 大字結算 → 再玩一次', async ({ page }, info) =>
   await page.locator('#btnAgain').click();
   await expect.poll(() => page.evaluate(() => BS.Game.phase)).toBe('play');
   const s = await state(page);
-  expect(s.hp).toBe(100);
+  expect(s.hp).toBe(await page.evaluate(() => BS.CFG.PLAYER.hp));
   expect(s.time).toBeLessThan(2);
   expect(errors).toEqual([]);
 });

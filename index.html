@@ -55,17 +55,19 @@
     <div class="tfoot">GitHub Game Off 2026 · Theme: Shift</div>
   </section>
 
+  <!-- 如何遊玩：全畫面，一頁一個段落（圖＋短文字），上方分頁、下方上一頁／下一頁 -->
   <section id="howto" class="screen hide">
-    <div class="card">
+    <header class="hw-top">
+      <button id="btnHowBack" class="hw-back"><span aria-hidden="true">‹</span><span data-i18n="btn.back"></span></button>
       <h2 data-i18n="how.title"></h2>
-      <p data-i18n-html="how.goal"></p>
-      <p data-i18n-html="how.run"></p>
-      <p data-i18n-html="how.items"></p>
-      <p data-i18n-html="how.evo"></p>
-      <p class="zlist" data-i18n-html="how.zombies"></p>
-      <p class="ctrl" data-i18n-html="how.ctrl"></p>
-      <button id="btnHowBack" class="primary" data-i18n="btn.back"></button>
-    </div>
+      <nav class="hw-tabs" id="hwTabs"></nav>
+    </header>
+    <div class="hw-pages" id="hwPages"></div>
+    <footer class="hw-foot">
+      <button id="hwPrev" data-i18n="btn.prev"></button>
+      <div class="hw-dots" id="hwDots"></div>
+      <button id="hwNext" class="primary"></button>
+    </footer>
   </section>
 
   <!-- 結算：大數字 -->
