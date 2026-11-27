@@ -53,32 +53,3 @@ export const DIR4 = [[1, 0], [0, 1], [-1, 0], [0, -1]];
 export const DIR8 = Array.from({ length: 8 }, (_, k) => [Math.cos(k * Math.PI / 4), Math.sin(k * Math.PI / 4)]);
 export const RADIO = { x: C / 2, y: R / 2 };
 export const TYPES = ['rusher', 'pathfinder', 'breaker', 'vaulter'];
-
-/* ============================== 調參數 ==============================
- * 參數面板（遊戲網址加 ?tune，或按 ` 鍵）和模擬（npm run sim -- --cfg 檔案.json）都用這裡的函式。
- * 覆寫值的格式跟 CFG 一樣的巢狀結構，只寫要改的欄位，例如 { "PLAYER": { "speed": 3.2 } }。 */
-export const CFG_DEFAULTS = JSON.parse(JSON.stringify(CFG));   // 原始數值（還原、比對用）
-/** 地圖尺寸會影響已經算好的常數（C、R、N），只能改程式後重新載入，不開放即時調整 */
-export const CFG_LOCKED = ['COLS', 'ROWS'];
-
-/** 把覆寫值套到 CFG（深層合併；不認得的欄位直接略過，避免打錯字變成新欄位） */
-export function applyCfg(over, target = CFG) {
-  for (const k in over) {
-    if (!(k in target) || CFG_LOCKED.includes(k) && target === CFG) continue;
-    const v = over[k];
-    if (v && typeof v === 'object' && typeof target[k] === 'object') applyCfg(v, target[k]);
-    else if (typeof v === typeof target[k]) target[k] = v;
-  }
-  return target;
-}
-/** 目前 CFG 跟原始數值的差異（只列出改過的欄位） */
-export function cfgDiff(cur = CFG, base = CFG_DEFAULTS) {
-  const out = {};
-  for (const k in base) {
-    if (cur[k] && typeof cur[k] === 'object') { const d = cfgDiff(cur[k], base[k]); if (Object.keys(d).length) out[k] = d; }
-    else if (cur[k] !== base[k]) out[k] = cur[k];
-  }
-  return out;
-}
-/** 全部還原成原始數值 */
-export function resetCfg() { applyCfg(JSON.parse(JSON.stringify(CFG_DEFAULTS))); }
