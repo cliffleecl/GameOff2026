@@ -17,6 +17,7 @@ H5 遊戲（Game Jam 主題「Shift」）：跑酷逃生 × 會進化的殭屍�
   - 開發新功能或調整時，從 `main` 開立 `<作者>/<kebab-case-主題>` 分支（例如 `kepler/improve-gameplay-and-presentation`）。
   - 合併回 `main` 前先 `rebase` 到最新的 `main`（保持半線性歷史），再以 `--no-ff` 建立 Merge Commit 合入 `main`，合併後刪除功能分支。
   - 若為自己開發，可直接在本機 `rebase` + `--no-ff` 合回 `main` 並推送，不需經過 PR；協作或需要 Review 時再開立 PR。
+  - **預設交付流程**：先在功能分支修改 → 開啟 Preview 讓使用者試玩確認 → 使用者確認後再 `rebase` + `--no-ff` 合回 `main` 並推送。
 - **Commit 習慣**：
   - 格式為 `[Tag] <英文簡述>`（首字大寫方括號標籤 + 空格 + 簡潔英文描述）。
   - 常用標籤：`[Init]`、`[Feature]`、`[UI]`、`[Visual]`、`[Refactor]`、`[Update]`、`[Fix]`、`[Remove]`、`[Docs]`、`[Test]`、`[Tool]`。
