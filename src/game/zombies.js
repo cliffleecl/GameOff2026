@@ -1,6 +1,7 @@
 /* 殭屍 AI：路徑成本、預判、誘餌、各類型的移動與互動。 */
 import { CFG, C, R, N, idx, ix, iy, inB, clamp, rnd, cellOf, DIR4, DIR8, RADIO, TYPES } from '../config.js';
 import { Feel, FX, Input } from '../fx.js';
+import { t } from '../i18n.js';
 import { Grid } from '../grid.js';
 import { resolve, clearLine, sight, lineHasTrap, lookAhead, steer, hash01 } from '../physics.js';
 import { Memory, knowsTrap } from '../memory.js';
@@ -71,8 +72,23 @@ Object.assign(Game, {
       if (best < 0) z.mode = 'chase'; else if (Math.hypot(P.x - z.x, P.y - z.y) > 2) goal = best;
     }
     else if (z.mode === 'predict' && !far) { const p = this.predictPos(z), g = cellOf(p.x, p.y); if (!Grid.blocks(g, z.vault)) goal = g; }
-    z.path = Path.find(cellOf(z.x, z.y), goal, this.zCost(z)) || [];
+    const cost = this.zCost(z);
+    if (cost(goal) === Infinity) goal = this.nearOpen(goal, z, cost);   // 你站在牠過不去的矮牆／障礙上：走到旁邊來抓你
+    z.path = Path.find(cellOf(z.x, z.y), goal, cost) || [];
     z.pi = 0;
+  },
+  /** 目標格過不去時，改走到它旁邊（離殭屍最近）的空格 */
+  nearOpen(goal, z, cost) {
+    let best = goal, bd = Infinity;
+    for (let r = 1; r <= 2 && best === goal; r++)
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+        const x = ix(goal) + dx, y = iy(goal) + dy;
+        if (!inB(x, y) || Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const i = idx(x, y); if (cost(i) === Infinity) continue;
+        const d = Math.hypot(x + 0.5 - z.x, y + 0.5 - z.y);
+        if (d < bd) { bd = d; best = i; }
+      }
+    return best;
   },
   /** 誘餌檢查：每隻殭屍（包括正在衝的盲衝型）定期看附近有沒有誘餌 */
   checkBait(z) {
@@ -107,7 +123,8 @@ Object.assign(Game, {
     if (z.mode === 'ambush') {
       if (dp < 5 || z.modeT > (z.guard ? 90 : 30)) { z.mode = 'chase'; z.waiting = false; z.repath = 0; if (dp < 5) { z.alertT = 0.9; FX.alert(z); } }
     }
-    if (dp < P.r + z.r + 0.12) {
+    // 你站在矮牆／障礙上：旁邊的殭屍伸手就抓得到（攻擊距離加長）
+    if (dp < P.r + z.r + 0.12 + (P.vaulting ? CFG.PLAYER.perchReach : 0)) {
       z.moving = false; z.mvx *= 0.5; z.mvy *= 0.5; z.dir = Math.atan2(dyp, dxp);
       if (z.atkCd <= 0) { z.atkCd = 1; this.hurtPlayer(z); }
       return;
@@ -135,6 +152,7 @@ Object.assign(Game, {
       if (next === undefined) {
         if (z.baitT >= 0) { if (z.cell === z.baitT && Grid.cells[z.cell]) this.eatBait(z, z.cell); else z.baitT = -1; z.repath = 0; return; }
         if (z.mode === 'ambush') z.waiting = true;
+        else if (P.vaulting && dp < 2.5 && z.mode !== 'wander') { this.moveZombie(z, P.x, P.y, dt); return; }   // 走到牆邊了：貼上去抓站在牆上的你
         z.moving = false; return;
       }
       if (Grid.blocks(next, z.vault)) {
@@ -180,6 +198,9 @@ Object.assign(Game, {
     const a = Math.atan2(ty - z.y, tx - z.x);
     const ahead = cellOf(z.x + Math.cos(a) * (z.r + 0.2), z.y + Math.sin(a) * (z.r + 0.2));
     // 正前方是障礙：不會沿著障礙滑開，只會一直往前頂（這就是「只照視線跑」）
+    // 例外：你就站在那道牆上 → 貼上去抓你
+    const P = this.player;
+    if (P.vaulting && Math.hypot(P.x - z.x, P.y - z.y) < 1.6) { this.moveZombie(z, tx, ty, dt); z.stuckT = 0; return; }
     if (Grid.isVaultable(ahead)) { z.mvx = z.mvy = 0; z.moving = true; z.dir = a; }
     else this.moveZombie(z, tx, ty, dt);
     if (Grid.isVaultable(ahead)) {
@@ -200,7 +221,7 @@ Object.assign(Game, {
     if (s.type === 'trap') {
       const T = CFG.BUILD.trap;
       z.stun = Math.max(z.stun, T.stun); z.slow = T.slowTime; z.flash = 0.15; this.period.snared++;
-      if (--s.uses <= 0) { Grid.remove(c); FX.msg('陷阱壞掉了'); }
+      if (--s.uses <= 0) Grid.remove(c);
     } else if (s.type === 'bait' && z.baitSeen[c] !== 2) this.eatBait(z, c);
   },
   eatBait(z, c) {
@@ -214,7 +235,7 @@ Object.assign(Game, {
   destroyStructure(i) {
     const s = Grid.cells[i]; if (!s) return;
     Grid.remove(i);
-    FX.broke(i, s.type); FX.msg(`${CFG.BUILD[s.type].name}被拆掉了`);
+    FX.broke(i, s.type);
     for (const z of this.zombies) z.repath = 0;
   },
   despawn(z) { z.dead = true; const i = this.zombies.indexOf(z); if (i >= 0) this.zombies.splice(i, 1); FX.despawn(z); },

@@ -57,12 +57,29 @@ export const InputDOM = {
       Input.kx = x; Input.ky = y;
     };
     window.addEventListener('keydown', e => {
+      // 如何遊玩：←→（或 A D）換頁、Enter／空白鍵下一頁、Esc 返回
+      if (UI.screen === 'howto') {
+        if (e.code === 'Escape') UI.show('title');
+        else if (e.code === 'ArrowLeft' || e.code === 'KeyA') UI.stepHow(-1);
+        else if (['ArrowRight', 'KeyD', 'Enter', 'Space'].includes(e.code)) UI.stepHow(1);
+        e.preventDefault();
+        return;
+      }
       if (map[e.code]) { this.keys[e.code] = true; upd(); e.preventDefault(); return; }
+      // 選單畫面：Enter／空白鍵＝主要按鈕，Esc＝返回
+      if (UI.screen) {
+        const ok = e.code === 'Enter' || e.code === 'Space';
+        if (UI.screen === 'title' && ok) UI.start();
+        else if (UI.screen === 'result' && ok) UI.restart(true);
+        if (ok) e.preventDefault();
+        return;
+      }
+      // 遊戲中：1 2 3 道具；F 速度、H 記憶圖、R 連按兩次重新開始（畫面上沒有按鈕，只有快捷鍵）
       const b = { Digit1: 'obstacle', Digit2: 'trap', Digit3: 'bait' }[e.code];
       if (b) { Game.drop(b); UI.sync(); }
       else if (e.code === 'KeyF') UI.cycleSpeed();
       else if (e.code === 'KeyH') UI.toggleMem();
-      else if ((e.code === 'Enter' || e.code === 'Space') && !UI.el.overlay.classList.contains('hide')) UI.el.obtn.click();
+      else if (e.code === 'KeyR') UI.pressReset();
     });
     window.addEventListener('keyup', e => { if (map[e.code]) { this.keys[e.code] = false; upd(); } });
     window.addEventListener('blur', () => { this.keys = {}; upd(); });
