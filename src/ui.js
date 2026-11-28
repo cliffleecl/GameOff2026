@@ -23,7 +23,7 @@ export const UI = {
     const $ = id => document.getElementById(id);
     for (const id of ['pbar', 'pfill', 'mfill', 'mseg', 'vTime', 'ticker', 'report', 'rTitle', 'rBody', 'builds', 'minimap', 'arPart', 'arRadio',
                       'evac', 'brainFill', 'brainStat', 'sParts', 'title', 'howto', 'result', 'btnStart', 'btnHow', 'btnLang', 'btnHowBack',
-                      'btnAgain', 'btnMenu', 'resTitle', 'resTag', 'resStats', 'resComp', 'resLegend', 'hwPages', 'hwTabs', 'hwDots', 'hwPrev', 'hwNext']) this.el[id] = $(id);
+                      'btnAgain', 'btnMenu', 'resTitle', 'resTag', 'resStats', 'resComp', 'hwPages', 'hwTabs', 'hwDots', 'hwPrev', 'hwNext']) this.el[id] = $(id);
     const e = this.el;
     // 圖示：data-icon="clock" → 換成 SVG
     for (const i of document.querySelectorAll('[data-icon]')) i.innerHTML = ICONS[i.dataset.icon];
@@ -128,16 +128,16 @@ export const UI = {
     e.resTag.textContent = t(win ? 'res.winTag' : 'res.loseTag');
     const stats = [
       ['res.time', fmtTime(Game.time)],
-      ['res.parts', `${Game.parts}<small>/${CFG.PARTS.goal}</small>`],
+      ['res.parts', Game.parts],
       ['res.evo', Memory.updates],
       ['res.items', Game.stats.items],
       ['res.escapes', Game.stats.escapes],
     ];
     e.resStats.innerHTML = stats.map(([k, v]) => `<div class="st"><b>${v}</b><small>${t(k)}</small></div>`).join('');
-    // 最後的族群：一條堆疊長條＋圖例
+    // 最後的族群：放大的堆疊長條，各種類文字直接寫在對應區塊裡面
     const sh = Memory.share();
-    e.resComp.innerHTML = TYPES.map(ty => `<i style="flex:${sh[ty]};background:${ZCOL[ty]}"></i>`).join('');
-    e.resLegend.innerHTML = TYPES.map(ty => `<span><i style="background:${ZCOL[ty]}"></i>${t('z.' + ty)} ${Math.round(sh[ty] * 100)}%</span>`).join('');
+    e.resComp.innerHTML = TYPES.filter(ty => sh[ty] > 0)
+      .map(ty => `<span style="flex:${sh[ty]};background:${ZCOL[ty]}" title="${t('z.' + ty)}">${t('z.' + ty)}</span>`).join('');
     this.show('result');
   },
 

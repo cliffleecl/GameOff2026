@@ -152,7 +152,7 @@ test('血量歸零 → 大字結算 → 再玩一次', async ({ page }, info) =>
   await expect(page.locator('#result')).toBeVisible();
   await expect(page.locator('#resTitle')).toHaveText('你被抓到了');
   await expect(page.locator('#resStats .st')).toHaveCount(5);
-  await expect(page.locator('#resLegend span')).toHaveCount(4);
+  await expect(page.locator('#resComp span')).toHaveCount(3);
   await info.attach('gameover', { body: await page.screenshot(), contentType: 'image/png' });
   await page.locator('#btnAgain').click();
   await expect.poll(() => page.evaluate(() => BS.Game.phase)).toBe('play');

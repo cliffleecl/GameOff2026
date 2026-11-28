@@ -230,15 +230,13 @@
   #result.win h1{color:var(--hp)} #result.lose h1{color:var(--bad)}
   #resTag{margin:2px 0 clamp(10px,3vh,26px);color:var(--dim);font-size:clamp(14px,2vw,18px)}
   .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
-  .st{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:clamp(8px,2vh,16px) 6px}
+  .st{display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:clamp(8px,2vh,16px) 6px}
   .st b{display:block;white-space:nowrap;font-size:clamp(28px,5.4vw,52px);font-weight:900;line-height:1.05;font-variant-numeric:tabular-nums;color:#fff}
-  .st b small{font-size:.5em;color:var(--dim);font-weight:700}
   .st small{display:block;margin-top:4px;color:var(--dim);font-size:clamp(11px,1.5vw,14px)}
   .comp{margin:clamp(10px,3vh,22px) auto 0;max-width:560px;text-align:left}
   .comp>small{color:var(--dim)}
-  #resComp{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:5px 0}
-  #resLegend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}
-  #resLegend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+  #resComp{display:flex;height:clamp(28px,4.5vh,36px);border-radius:8px;overflow:hidden;margin:6px 0 0}
+  #resComp span{display:flex;align-items:center;justify-content:center;min-width:0;padding:0 4px;overflow:hidden;white-space:nowrap;font-size:clamp(11px,1.5vw,14px);font-weight:800;color:#0b0d16}
   .rbtns{display:flex;gap:10px;justify-content:center;margin-top:clamp(12px,3vh,26px)}
   .rbtns button{min-width:170px}
 

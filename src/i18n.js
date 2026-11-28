@@ -77,7 +77,7 @@ export const __DICT = {   // 匯出只給測試檢查翻譯是否齊全
     'how.ctrl.t': 'Controls',
     'how.ctrl.b': '<p>Press <b>Start Game</b> when you\'re ready.</p>',
     'how.ctrl.pc': 'PC', 'how.ctrl.mobile': 'Mobile (landscape)',
-    'how.ctrl.pcKeys': 'WASD / arrows or click to move · 1 2 3 items<br>F speed · H memory map · R twice to restart',
+    'how.ctrl.pcKeys': 'WASD / arrows or click to move<br>1 2 3 or click buttons for items',
     'how.ctrl.mobileKeys': 'Left thumb anywhere = joystick<br>Right thumb = item buttons',
   },
 
@@ -137,7 +137,7 @@ export const __DICT = {   // 匯出只給測試檢查翻譯是否齊全
     'how.ctrl.t': '操作',
     'how.ctrl.b': '<p>準備好就按<b>開始遊戲</b>。</p>',
     'how.ctrl.pc': '電腦', 'how.ctrl.mobile': '手機（橫向）',
-    'how.ctrl.pcKeys': 'WASD／方向鍵或滑鼠點地面移動・1 2 3 道具<br>F 加速・H 記憶圖・連按兩次 R 重新開始',
+    'how.ctrl.pcKeys': 'WASD／方向鍵或滑鼠點地面移動<br>1 2 3 或點擊按鈕放道具',
     'how.ctrl.mobileKeys': '左手按任意處＝搖桿<br>右手＝道具按鈕',
   },
 
@@ -197,7 +197,7 @@ export const __DICT = {   // 匯出只給測試檢查翻譯是否齊全
     'how.ctrl.t': '操作',
     'how.ctrl.b': '<p>准备好就按<b>开始游戏</b>。</p>',
     'how.ctrl.pc': '电脑', 'how.ctrl.mobile': '手机（横屏）',
-    'how.ctrl.pcKeys': 'WASD／方向键或鼠标点地面移动・1 2 3 道具<br>F 加速・H 记忆图・连按两次 R 重新开始',
+    'how.ctrl.pcKeys': 'WASD／方向键或鼠标点地面移动<br>1 2 3 或点击按钮放道具',
     'how.ctrl.mobileKeys': '左手按任意处＝摇杆<br>右手＝道具按钮',
   },
 };
