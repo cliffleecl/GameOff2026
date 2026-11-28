@@ -12,10 +12,11 @@ H5 遊戲（Game Jam 主題「Shift」）：跑酷逃生 × 會進化的殭屍�
 
 ## Git 分支策略與 Commit 習慣
 
-- **分支策略**：
+- **分支策略（Semi-linear）**：
   - `main` 為唯一常駐主分支（推送至 `main` 會透過 `.github/workflows/deploy.yml` 自動建置並發佈到 GitHub Pages）。
   - 開發新功能或調整時，從 `main` 開立 `<作者>/<kebab-case-主題>` 分支（例如 `kepler/improve-gameplay-and-presentation`）。
-  - 完成後透過 PR 或 Merge Commit 合併回 `main`（保留分支 commit 歷史，不使用 squash），合併後刪除功能分支。
+  - 合併回 `main` 前先 `rebase` 到最新的 `main`（保持半線性歷史），再以 `--no-ff` 建立 Merge Commit 合入 `main`，合併後刪除功能分支。
+  - 若為自己開發，可直接在本機 `rebase` + `--no-ff` 合回 `main` 並推送，不需經過 PR；協作或需要 Review 時再開立 PR。
 - **Commit 習慣**：
   - 格式為 `[Tag] <英文簡述>`（首字大寫方括號標籤 + 空格 + 簡潔英文描述）。
   - 常用標籤：`[Init]`、`[Feature]`、`[UI]`、`[Visual]`、`[Refactor]`、`[Update]`、`[Fix]`、`[Remove]`、`[Docs]`、`[Test]`、`[Tool]`。
