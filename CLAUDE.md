@@ -10,6 +10,18 @@ H5 遊戲（Game Jam 主題「Shift」）：跑酷逃生 × 會進化的殭屍�
 - 使用者是遊戲設計者，會直接玩了再給回饋。回報時先講結論和玩起來會有什麼不同，再講實作細節。
 - 設計上有疑慮就直接說（例如「這樣會讓 X 變成最佳解」），並盡量用 `npm run sim` 的數據佐證，不要只憑感覺。
 
+## Git 分支策略與 Commit 習慣
+
+- **分支策略（Semi-linear）**：
+  - `main` 為唯一常駐主分支（推送至 `main` 會透過 `.github/workflows/deploy.yml` 自動建置並發佈到 GitHub Pages）。
+  - 開發新功能或調整時，從 `main` 開立 `<作者>/<kebab-case-主題>` 分支（例如 `kepler/improve-gameplay-and-presentation`）。
+  - 合併回 `main` 前先 `rebase` 到最新的 `main`（保持半線性歷史），再以 `--no-ff` 建立 Merge Commit 合入 `main`，合併後刪除功能分支。
+  - 若為自己開發，可直接在本機 `rebase` + `--no-ff` 合回 `main` 並推送，不需經過 PR；協作或需要 Review 時再開立 PR。
+- **Commit 習慣**：
+  - 格式為 `[Tag] <英文簡述>`（首字大寫方括號標籤 + 空格 + 簡潔英文描述）。
+  - 常用標籤：`[Init]`、`[Feature]`、`[UI]`、`[Visual]`、`[Refactor]`、`[Update]`、`[Fix]`、`[Remove]`、`[Docs]`、`[Test]`、`[Tool]`。
+  - Commit message 一律使用**英文**；PR 標題／內文可使用**繁體中文**（PR 標題可複合標籤，如 `[UI][Feature]`）。
+
 ## 指令
 
 ```bash
